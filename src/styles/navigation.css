@@ -1,0 +1,65 @@
+/* Keyboard navigation highlighting */
+.keyboard-highlighted {
+  background-color: var(--selection-background, #0078d4) !important;
+  color: var(--selection-foreground, #ffffff) !important;
+  outline: 2px solid var(--focus-border, #007acc) !important;
+  outline-offset: -2px;
+}
+
+/* Ensure highlighted items are visible */
+.keyboard-highlighted .table-row-count,
+.keyboard-highlighted .table-prefix,
+.keyboard-highlighted .table-main-name,
+.keyboard-highlighted .query-name,
+.keyboard-highlighted .tree-label {
+  color: inherit !important;
+}
+
+/* Highlight status icons and other elements */
+.keyboard-highlighted .status-icon,
+.keyboard-highlighted .status-text,
+.keyboard-highlighted .tree-size {
+  color: inherit !important;
+  opacity: 0.9;
+}
+
+/* Special handling for VS Code-like highlighting */
+.tree-item.keyboard-highlighted {
+  background-color: var(--list-active-selection-background, #0078d4) !important;
+  color: var(--list-active-selection-foreground, #ffffff) !important;
+}
+
+.table-item-compact.keyboard-highlighted {
+  background-color: var(--list-active-selection-background, #0078d4) !important;
+  color: var(--list-active-selection-foreground, #ffffff) !important;
+}
+
+.query-item.keyboard-highlighted {
+  background-color: var(--list-active-selection-background, #0078d4) !important;
+  color: var(--list-active-selection-foreground, #ffffff) !important;
+}
+
+/* Smooth transitions for better UX */
+.tree-item,
+.table-item-compact,
+.query-item {
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+/* Focus indicators for accessibility */
+.keyboard-highlighted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--focus-border, #007acc);
+  z-index: 1;
+}
+
+.tree-item.keyboard-highlighted::before,
+.table-item-compact.keyboard-highlighted::before,
+.query-item.keyboard-highlighted::before {
+  left: 0;
+}

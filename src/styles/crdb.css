@@ -1,0 +1,74 @@
+/* CRDB Transform Styles */
+.sql-null {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.sql-cell-hex {
+  position: relative;
+}
+
+.sql-cell-pretty {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  cursor: pointer;
+}
+
+.sql-cell-pretty:hover {
+  color: var(--accent-secondary);
+}
+
+.sql-cell-json {
+  position: relative;
+}
+
+.sql-cell-expanded {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  padding: 8px;
+  border-radius: 4px;
+  max-width: 500px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  margin-top: 4px;
+}
+
+.sql-cell-hex-value {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-secondary);
+  font-size: 10px;
+}
+
+.sql-cell-parts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.sql-cell-parts > div {
+  margin: 2px 0;
+  padding: 2px 4px;
+  background: var(--bg-quaternary);
+  border-radius: 2px;
+}
+
+.sql-cell-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-secondary);
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-style: italic;
+}

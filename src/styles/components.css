@@ -1,0 +1,1330 @@
+/* Stackgazer-style Section Headers and Components */
+
+/* Section Container */
+.section {
+  background: var(--bg-tertiary);
+  margin: 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  position: relative;
+}
+
+/* Remove margins for groups inside file sections so they fill completely */
+.file-section .group-section {
+  margin: 0 0 0 10px;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+/* For single-group file sections, remove left margin so header fills full width */
+.file-section.single-group .group-section {
+  margin-left: 0;
+}
+
+/* First group gets top border radius, last group gets bottom border radius */
+.file-section .group-section:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.file-section .group-section:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+/* Only group gets all borders and radius */
+.file-section .group-section:only-child {
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+}
+
+/* Category sections get more prominent rounded corners */
+.category-section {
+  border-radius: 12px;
+}
+
+/* Stack sections and file sections styling */
+.stack-section,
+.file-section {
+  margin-bottom: 20px;
+  border: 2px solid var(--accent-border);
+  border-radius: 8px;
+  cursor: text;
+  user-select: text;
+  position: relative;
+}
+
+/* Prominent Headers - Stackgazer Style */
+.header {
+  background: var(--accent-primary);
+  color: white;
+  padding: 12px 15px;
+  font-weight: bold;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.header:hover {
+  background: var(--accent-primary-hover);
+}
+
+/* File section headers should use neutral styling */
+.file-section .header {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+}
+
+.file-section .header:hover {
+  background: var(--header-hover-light);
+}
+
+/* Hide file section headers only for single-group sections to avoid redundancy */
+.file-section.single-group > .header {
+  display: none;
+}
+
+/* Style all group headers with file-like appearance since they contain filenames */
+.file-section .group-section .header {
+  background: var(--bg-quaternary);
+  color: var(--text-primary);
+}
+
+.file-section .group-section .header:hover {
+  background: var(--header-hover-light);
+}
+
+/* Header titles and controls */
+.group-title,
+.stack-title,
+.category-title {
+  cursor: text;
+  user-select: text;
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Add downward arrow with rightward tip prefix to stack titles */
+.stack-title::before {
+  content: "↳";
+  margin-right: -4px;
+  opacity: 1;
+  font-size: 1.1em;
+  position: relative;
+  top: -3px;
+}
+
+/* Header right container for count and stats */
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+/* Consistent spacing to prevent text shifting */
+.header .counts {
+  margin-right: 36px;
+  cursor: text;
+  user-select: text;
+}
+
+/* Stats display below counts in headers */
+.category-stats,
+.stack-stats {
+  font-size: 9px;
+  color: color-mix(in srgb, white 60%, transparent);
+  white-space: nowrap;
+  text-align: right;
+  margin-right: 36px; /* Same as counts to avoid pin button overlap */
+  cursor: text;
+  user-select: text;
+}
+
+.category-stats:empty,
+.stack-stats:empty {
+  display: none;
+}
+
+/* Section Content */
+.section-content {
+  padding: 10px;
+  transition: all 0.2s ease;
+}
+
+/* Remove padding from file section content so groups fill completely */
+.file-section > .section-content {
+  padding: 0;
+}
+
+/* Expandable container states - specific for categories and stacks */
+.expandable.container-collapsed > .section-content {
+  display: none;
+}
+
+/* Expandable section states - specific for files and groups */
+.expandable.section-collapsed > .section-content {
+  display: none;
+}
+
+/* Hide group section content when it has no children */
+.group-section .section-content:empty {
+  display: none;
+}
+
+/* Expand/collapse icons using CSS content - reusable for any header */
+.expandable .expand-icon::before {
+  content: '▼';
+  margin-right: 6px;
+}
+
+.expandable.container-collapsed .expand-icon::before,
+.expandable.section-collapsed .expand-icon::before {
+  content: '▶';
+}
+
+/* Generic pin button system - reusable across contexts */
+.pin-button {
+  --pin-size: 28px;
+  --pin-font: 16px;
+  --pin-top: -14px;
+  --pin-right: -14px;
+  --pin-z: 10;
+  --pin-hover-size: 53px;
+  --pin-hover-font: 26px;
+  --pin-hover-offset: -26px;
+  --pin-pinned-size: 36px;
+  --pin-pinned-font: 18px;
+  --pin-pinned-offset: -18px;
+  --pin-target-size: 24px;
+
+  position: absolute;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  opacity: 0; /* Hidden by default */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: normal;
+  width: var(--pin-size);
+  height: var(--pin-size);
+  font-size: var(--pin-font);
+  top: var(--pin-top);
+  right: var(--pin-right);
+  z-index: var(--pin-z);
+}
+
+.pin-button.size-small {
+  --pin-size: 18px;
+  --pin-font: 10px;
+  --pin-top: 3px;
+  --pin-right: -25px;
+  --pin-z: 5;
+  --pin-hover-size: 32px;
+  --pin-hover-font: 16px;
+  --pin-hover-offset: -30px;
+  --pin-hover-top: -4px;
+  --pin-pinned-size: 20px;
+  --pin-pinned-font: 11px;
+  --pin-pinned-top: 2px;
+  --pin-pinned-offset: -27px;
+  --pin-target-size: 16px;
+}
+
+/* Hover reveal for unpinned pins */
+.section:hover > .header > .pin-button:not(.pinned),
+.goroutine-entry:hover > .pin-button:not(.pinned) {
+  opacity: 0.7; /* Less dim on hover */
+}
+
+/* Expanded click targets */
+.pin-button::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--pin-target-size) * -1);
+  left: calc(var(--pin-target-size) * -1);
+  right: calc(var(--pin-target-size) * -1);
+  bottom: calc(var(--pin-target-size) * -1);
+  border-radius: 50%;
+}
+
+/* Hover states */
+.pin-button:hover {
+  background: var(--bg-quaternary);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+  opacity: 1 !important;
+  width: var(--pin-hover-size);
+  height: var(--pin-hover-size);
+  font-size: var(--pin-hover-font);
+  top: calc(var(--pin-top) - (var(--pin-hover-size) - var(--pin-size)) / 2);
+  right: calc(var(--pin-right) - (var(--pin-hover-size) - var(--pin-size)) / 2);
+}
+
+.pin-button.size-small:hover {
+  top: calc(var(--pin-top) - (var(--pin-hover-size) - var(--pin-size)) / 2);
+  right: calc(var(--pin-right) - (var(--pin-hover-size) - var(--pin-size)) / 2);
+}
+
+/* Pinned states */
+.pin-button.pinned {
+  background: var(--bg-quaternary);
+  opacity: 1 !important;
+  border: 2px solid var(--border-primary);
+  color: var(--text-primary);
+  width: var(--pin-pinned-size);
+  height: var(--pin-pinned-size);
+  font-size: var(--pin-pinned-font);
+  top: var(--pin-top);
+  right: var(--pin-right);
+}
+
+.pin-button.size-small.pinned {
+  top: var(--pin-top);
+}
+
+/* Pinned hover states */
+.pin-button.pinned:hover {
+  color: var(--text-primary);
+  border: 2px solid var(--text-primary);
+  width: var(--pin-hover-size);
+  height: var(--pin-hover-size);
+  font-size: var(--pin-hover-font);
+  top: calc(var(--pin-top) - (var(--pin-hover-size) - var(--pin-pinned-size)) / 2);
+  right: calc(var(--pin-right) - (var(--pin-hover-size) - var(--pin-pinned-size)) / 2);
+}
+
+.pin-button.size-small.pinned:hover {
+  top: calc(var(--pin-top) - (var(--pin-hover-size) - var(--pin-pinned-size)) / 2);
+  right: calc(var(--pin-right) - (var(--pin-hover-size) - var(--pin-pinned-size)) / 2);
+}
+
+/* Monaco Editor Protection - ensure no interference with hidden line functionality */
+.monaco-editor .view-lines .view-line.hidden-line,
+.monaco-editor .view-lines .view-line[style*="display: none"],
+.monaco-editor .view-lines .view-line[aria-hidden="true"] {
+  /* Don't override Monaco's hidden line styling */
+}
+
+/* Grep/Filter Highlight in Monaco */
+.grep-highlight {
+  background-color: rgba(255, 200, 0, 0.3) !important;
+  border: 1px solid rgba(255, 200, 0, 0.5);
+  border-radius: 2px;
+}
+
+.grep-exclude-highlight {
+  background-color: rgba(255, 100, 100, 0.2) !important;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Hidden lines for filtering - DISABLED to avoid Monaco conflicts */
+/*.hidden-line {
+  display: none !important;
+}
+
+.hidden-line-gutter {
+  display: none !important;
+}*/
+
+/* File Controls Bar */
+.file-controls {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  gap: 8px;
+  height: 40px;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.context-input {
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.context-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.regex-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.regex-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.match-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 8px;
+}
+
+.nav-button {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 3px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--bg-quaternary);
+  border-color: var(--accent-primary);
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* File Tree - VS Code style */
+.file-tree {
+  font-size: 13px;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.tree-node {
+  position: relative;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+}
+
+.tree-item:hover {
+  background: var(--bg-quaternary);
+}
+
+.tree-item.file {
+  color: var(--text-primary);
+}
+
+.tree-item.folder {
+  color: var(--text-primary);
+}
+
+.tree-chevron {
+  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.tree-icon {
+  margin: 0 4px;
+  font-size: 16px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-size {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  margin-right: 8px;
+  opacity: 0.8;
+}
+
+/* File Viewer */
+.file-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  height: 100%;
+  overflow: hidden;
+}
+
+.file-viewer.loading,
+.file-viewer.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-content-container {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.file-content {
+  font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 16px;
+  margin: 0;
+  white-space: pre;
+  color: var(--text-primary);
+  overflow: auto;
+  height: 100%;
+}
+
+.file-content code {
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Filter Input */
+.filter-section {
+  padding: 0 8px;
+  margin-bottom: 16px;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Loading Progress - Subtle bar */
+.loading-progress-bar {
+  height: 3px;
+  background: rgba(128, 128, 128, 0.2);
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-progress-bar .progress-fill {
+  height: 100%;
+  background: #007acc;
+  transition: width 0.4s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.empty-tab-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Tables View */
+.table-item {
+  padding: 8px;
+  margin-bottom: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+/* Compact Table Item Design */
+.table-item-compact {
+  position: relative;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  min-height: 36px;
+}
+
+.table-item-compact:hover {
+  background: var(--bg-quaternary);
+}
+
+.table-item-compact.empty-table {
+  opacity: 0.6;
+}
+
+.table-item-compact.deferred {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+}
+
+.table-name-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.table-prefix {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.table-main-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.table-row-count {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.table-status-compact {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-icon {
+  font-size: 10px;
+}
+
+.status-text {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.subsection-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  margin-top: 8px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-group {
+  margin-top: 16px;
+}
+
+.node-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.table-item:hover {
+  background: var(--bg-quaternary);
+}
+
+.table-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.table-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.table-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.table-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 12px;
+}
+
+.table-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.table-status.loaded {
+  color: var(--accent-success);
+}
+
+.table-status.deferred {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.table-status.loading {
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.table-item.deferred {
+  opacity: 0.8;
+}
+
+.table-item.deferred:hover {
+  opacity: 1;
+  background: var(--bg-quaternary);
+  cursor: pointer;
+}
+
+.table-item.loading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.table-item.load-failed {
+  opacity: 0.9;
+}
+
+.table-item.error-file {
+  opacity: 0.8;
+}
+
+.table-item.error-file:hover {
+  opacity: 1;
+}
+
+.table-name.strikethrough {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.table-status.error {
+  color: var(--accent-danger);
+  font-style: italic;
+}
+
+.table-status.failed {
+  color: var(--accent-danger);
+  cursor: pointer;
+}
+
+/* Node Groups */
+.node-group {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.node-group:first-child {
+  margin-top: 0;
+}
+
+.node-subheader {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  padding: 0 4px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-subheader.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.node-subheader.clickable:hover {
+  opacity: 1;
+  color: var(--text-secondary);
+}
+
+/* Table Sections */
+.table-section {
+  padding: 0 8px;
+  margin-bottom: 16px;
+}
+
+/* Main section headers (blue like stackgazer) */
+.section-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: 8px;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Sub-section headers (gray like stackgazer) */
+.section-header.sub-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.section-header.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header.clickable:hover {
+  color: var(--text-secondary);
+}
+
+.section-chevron {
+  font-size: 9px;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.query-item {
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.query-item:hover {
+  background: var(--bg-quaternary);
+}
+
+.query-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Search View */
+.search-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 6px 8px;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.search-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* SQL Editor */
+.sql-editor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+
+.sql-editor-container {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.sql-run-button {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  z-index: 10;
+  padding: 4px 12px;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  opacity: 0.9;
+}
+
+.sql-run-button:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+  opacity: 1;
+}
+
+.sql-run-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-tertiary);
+}
+
+.sql-input {
+  flex: 0 0 200px;
+  padding: 10px;
+  background: var(--bg-secondary);
+  border: none;
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.sql-input:focus {
+  outline: none;
+  background: var(--bg-tertiary);
+}
+
+.sql-results {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-primary);
+  padding: 16px;
+}
+
+.sql-error {
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-danger);
+  border-radius: 4px;
+  color: var(--accent-danger);
+  font-size: 12px;
+}
+
+.sql-table-wrapper {
+  overflow: auto;
+}
+
+.sql-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sql-table th {
+  text-align: left;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.sql-table td {
+  padding: 6px 8px;
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  max-width: 400px;
+  word-break: break-all;
+  white-space: pre-wrap;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.sql-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sql-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sql-truncated {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Loading and Progress */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-secondary);
+  border-top: 3px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.loading-message {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Streaming indicators */
+.streaming-header {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg-primary) 70%, transparent);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.streaming-footer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg-primary) 70%, transparent);
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-primary);
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.streaming-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streaming-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.streaming-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.loading-spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-quaternary);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary)));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Enhanced File Viewer */
+.enhanced-file-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.file-controls {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  min-height: 40px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.filter-controls,
+.search-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-input,
+.search-input {
+  padding: 4px 8px;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  min-width: 150px;
+}
+
+.filter-input:focus,
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-primary);
+}
+
+.filter-status,
+.match-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.regex-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.regex-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.nav-button {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--bg-quaternary);
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Sticky header for CSV/TSV */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-primary);
+  font-weight: 600;
+}
+
+.sticky-header .file-line {
+  background: var(--bg-tertiary);
+}
+
+/* File content with virtual scrolling */
+.file-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.file-lines {
+  position: relative;
+}
+
+.file-line {
+  display: flex;
+  white-space: pre;
+  position: relative;
+  border-bottom: 1px solid transparent;
+}
+
+.file-line:hover {
+  background: var(--bg-secondary);
+}
+
+.line-number {
+  display: inline-block;
+  min-width: 60px;
+  padding: 0 12px 0 8px;
+  text-align: right;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.line-content {
+  flex: 1;
+  padding: 0 8px;
+  overflow-x: visible;
+}
+
+/* Search highlighting */
+.search-highlight {
+  background: var(--accent-warning);
+  color: var(--bg-primary);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.file-line.current-match .search-highlight {
+  background: var(--accent-primary);
+  color: white;
+}
+
+/* Header line styling */
+.header-line {
+  font-weight: 600;
+  background: var(--bg-tertiary);
+}
+
+.header-line .line-content {
+  color: var(--text-primary);
+}
