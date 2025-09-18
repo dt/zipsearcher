@@ -10,6 +10,83 @@ export interface KeyPart {
   raw?: string;
 }
 
+// Encoding constants from CockroachDB's encoding.go
+const encodedNull = 0x00;
+const encodedNotNull = 0x01;
+
+const floatNaN = encodedNotNull + 1; // 0x02
+const floatNeg = floatNaN + 1; // 0x03
+const floatZero = floatNeg + 1; // 0x04
+const floatPos = floatZero + 1; // 0x05
+const floatNaNDesc = floatPos + 1; // 0x06
+
+const bytesMarker = 0x12;
+const bytesDescMarker = bytesMarker + 1; // 0x13
+const timeMarker = bytesDescMarker + 1; // 0x14
+const durationBigNegMarker = timeMarker + 1; // 0x15
+const durationMarker = durationBigNegMarker + 1; // 0x16
+const durationBigPosMarker = durationMarker + 1; // 0x17
+
+const decimalNaN = durationBigPosMarker + 1; // 0x18
+const decimalNegativeInfinity = decimalNaN + 1; // 0x19
+const decimalNegLarge = decimalNegativeInfinity + 1; // 0x1a
+const decimalNegMedium = decimalNegLarge + 11; // 0x25
+const decimalNegSmall = decimalNegMedium + 1; // 0x26
+const decimalZero = decimalNegSmall + 1; // 0x27
+const decimalPosSmall = decimalZero + 1; // 0x28
+const decimalPosMedium = decimalPosSmall + 1; // 0x29
+const decimalPosLarge = decimalPosMedium + 11; // 0x34
+const decimalInfinity = decimalPosLarge + 1; // 0x35
+const decimalNaNDesc = decimalInfinity + 1; // 0x36
+
+const jsonInvertedIndex = decimalNaNDesc + 1; // 0x37
+const jsonEmptyArray = jsonInvertedIndex + 1; // 0x38
+const jsonEmptyObject = jsonEmptyArray + 1; // 0x39
+
+const bitArrayMarker = jsonEmptyObject + 1; // 0x3a
+const bitArrayDescMarker = bitArrayMarker + 1; // 0x3b
+
+const timeTZMarker = bitArrayDescMarker + 1; // 0x3c
+const geoMarker = timeTZMarker + 1; // 0x3d
+const geoDescMarker = geoMarker + 1; // 0x3e
+
+const arrayKeyMarker = geoDescMarker + 1; // 0x3f
+const arrayKeyDescendingMarker = arrayKeyMarker + 1; // 0x40
+
+const box2DMarker = arrayKeyDescendingMarker + 1; // 0x41
+const geoInvertedIndexMarker = box2DMarker + 1; // 0x42
+
+const emptyArray = geoInvertedIndexMarker + 1; // 0x43
+const voidMarker = emptyArray + 1; // 0x44
+
+const jsonEmptyArrayKeyMarker = voidMarker + 1; // 0x45
+const jsonNullKeyMarker = jsonEmptyArrayKeyMarker + 1; // 0x46
+const jsonStringKeyMarker = jsonNullKeyMarker + 1; // 0x47
+const jsonNumberKeyMarker = jsonStringKeyMarker + 1; // 0x48
+const jsonFalseKeyMarker = jsonNumberKeyMarker + 1; // 0x49
+const jsonTrueKeyMarker = jsonFalseKeyMarker + 1; // 0x4a
+const jsonArrayKeyMarker = jsonTrueKeyMarker + 1; // 0x4b
+const jsonObjectKeyMarker = jsonArrayKeyMarker + 1; // 0x4c
+
+const jsonEmptyArrayKeyDescendingMarker = jsonObjectKeyMarker + 8; // 0x54
+const jsonNullKeyDescendingMarker = jsonEmptyArrayKeyDescendingMarker - 1; // 0x53
+const jsonStringKeyDescendingMarker = jsonNullKeyDescendingMarker - 1; // 0x52
+const jsonNumberKeyDescendingMarker = jsonStringKeyDescendingMarker - 1; // 0x51
+const jsonFalseKeyDescendingMarker = jsonNumberKeyDescendingMarker - 1; // 0x50
+const jsonTrueKeyDescendingMarker = jsonFalseKeyDescendingMarker - 1; // 0x4f
+const jsonArrayKeyDescendingMarker = jsonTrueKeyDescendingMarker - 1; // 0x4e
+const jsonObjectKeyDescendingMarker = jsonArrayKeyDescendingMarker - 1; // 0x4d
+
+const ltreeKeyMarker = jsonEmptyArrayKeyDescendingMarker + 1; // 0x55
+const ltreeKeyDescendingMarker = ltreeKeyMarker + 1; // 0x56
+
+const IntMin = 0x80; // 128
+const IntMax = 0xfd; // 253
+
+const encodedNotNullDesc = 0xfe;
+const encodedNullDesc = 0xff;
+
+// CRDB System Tables (preserved from original implementation)
 const SYSTEM_TABLES: Record<number, string> = {
   0: 'NamespaceTable',
   1: 'DescriptorTable',
@@ -56,34 +133,466 @@ const SYSTEM_TABLES: Record<number, string> = {
   51: 'MVCCStatisticsTable'
 };
 
-function readVarint(bytes: Uint8Array, offset: number): [number, number] {
-  let value = 0;
-  let shift = 0;
-  let i = offset;
-
-  while (i < bytes.length) {
-    const byte = bytes[i++];
-    value |= (byte & 0x7f) << shift;
-    if ((byte & 0x80) === 0) {
-      break;
-    }
-    shift += 7;
-  }
-
-  return [value, i];
+// Type enum values
+const enum Type {
+  Unknown = 0,
+  Null = 1,
+  NotNull = 2,
+  Int = 3,
+  Float = 4,
+  Decimal = 5,
+  Bytes = 6,
+  BytesDesc = 7,
+  Time = 8,
+  Duration = 9,
+  True = 10,
+  False = 11,
+  UUID = 12,
+  Array = 13,
+  IPAddr = 14,
+  JSON = 15,
+  Tuple = 16,
+  BitArray = 17,
+  BitArrayDesc = 18,
+  TimeTZ = 19,
+  Geo = 20,
+  GeoDesc = 21,
+  ArrayKeyAsc = 22,
+  ArrayKeyDesc = 23,
+  Box2D = 24,
+  Void = 25,
+  TSQuery = 26,
+  TSVector = 27,
+  JSONNull = 28,
+  JSONNullDesc = 29,
+  JSONString = 30,
+  JSONStringDesc = 31,
+  JSONNumber = 32,
+  JSONNumberDesc = 33,
+  JSONFalse = 34,
+  JSONFalseDesc = 35,
+  JSONTrue = 36,
+  JSONTrueDesc = 37,
+  JSONArray = 38,
+  JSONArrayDesc = 39,
+  JSONObject = 40,
+  JSONObjectDesc = 41,
+  JsonEmptyArray = 42,
+  JsonEmptyArrayDesc = 43,
+  PGVector = 44,
+  LTree = 45,
+  LTreeDesc = 46
 }
 
+// Direction enum
+const enum Direction {
+  Ascending = 1,
+  Descending = 2
+}
+
+// PeekType implementation matching the Go version
+function peekType(b: Uint8Array): Type {
+  if (b.length === 0) return Type.Unknown;
+
+  const m = b[0];
+
+  if (m === encodedNull || m === encodedNullDesc) return Type.Null;
+  if (m === encodedNotNull || m === encodedNotNullDesc) return Type.NotNull;
+  if (m === arrayKeyMarker) return Type.ArrayKeyAsc;
+  if (m === arrayKeyDescendingMarker) return Type.ArrayKeyDesc;
+  if (m === jsonNullKeyMarker) return Type.JSONNull;
+  if (m === jsonNullKeyDescendingMarker) return Type.JSONNullDesc;
+  if (m === jsonStringKeyMarker) return Type.JSONString;
+  if (m === jsonStringKeyDescendingMarker) return Type.JSONStringDesc;
+  if (m === jsonNumberKeyMarker) return Type.JSONNumber;
+  if (m === jsonNumberKeyDescendingMarker) return Type.JSONNumberDesc;
+  if (m === jsonFalseKeyMarker) return Type.JSONFalse;
+  if (m === jsonFalseKeyDescendingMarker) return Type.JSONFalseDesc;
+  if (m === jsonTrueKeyMarker) return Type.JSONTrue;
+  if (m === jsonTrueKeyDescendingMarker) return Type.JSONTrueDesc;
+  if (m === jsonArrayKeyMarker) return Type.JSONArray;
+  if (m === jsonArrayKeyDescendingMarker) return Type.JSONArrayDesc;
+  if (m === jsonEmptyArrayKeyMarker) return Type.JsonEmptyArray;
+  if (m === jsonEmptyArrayKeyDescendingMarker) return Type.JsonEmptyArrayDesc;
+  if (m === jsonObjectKeyMarker) return Type.JSONObject;
+  if (m === jsonObjectKeyDescendingMarker) return Type.JSONObjectDesc;
+  if (m === bytesMarker) return Type.Bytes;
+  if (m === bytesDescMarker) return Type.BytesDesc;
+  if (m === bitArrayMarker) return Type.BitArray;
+  if (m === bitArrayDescMarker) return Type.BitArrayDesc;
+  if (m === timeMarker) return Type.Time;
+  if (m === timeTZMarker) return Type.TimeTZ;
+  if (m === geoMarker) return Type.Geo;
+  if (m === box2DMarker) return Type.Box2D;
+  if (m === geoDescMarker) return Type.GeoDesc;
+  if (m === Type.Array) return Type.Array;
+  if (m === Type.True) return Type.True;
+  if (m === Type.False) return Type.False;
+  if (m === durationBigNegMarker || m === durationMarker || m === durationBigPosMarker) return Type.Duration;
+  if (m >= IntMin && m <= IntMax) return Type.Int;
+  if (m >= floatNaN && m <= floatNaNDesc) return Type.Float;
+  if (m >= decimalNaN && m <= decimalNaNDesc) return Type.Decimal;
+  if (m === voidMarker) return Type.Void;
+  if (m === ltreeKeyMarker) return Type.LTree;
+  if (m === ltreeKeyDescendingMarker) return Type.LTreeDesc;
+
+  return Type.Unknown;
+}
+
+// DecodeVarintDescending - exact implementation from Go
+function decodeVarintDescending(b: Uint8Array): [Uint8Array, number, Error?] {
+  const [leftover, v, err] = decodeVarintAscending(b);
+  return [leftover, ~v, err];
+}
+
+function decodeUnsafeStringAscending(b: Uint8Array): [Uint8Array, string, Error?] {
+  if (b.length === 0 || b[0] !== bytesMarker) {
+    return [b, "", new Error("not a bytes marker")];
+  }
+
+  // Skip the marker
+  let remaining = b.slice(1);
+  const result: number[] = [];
+
+  // Escape constants from Go code
+  const escape = 0x00;
+  const escapedTerm = 0x01;
+  const escaped00 = 0xff;
+  // When we see "0x00 0xff", we should append the original 0x00 byte to result
+
+  while (true) {
+    // Find the next escape byte (0x00)
+    const i = remaining.indexOf(escape);
+    if (i === -1) {
+      return [new Uint8Array(), "", new Error("did not find terminator")];
+    }
+    if (i + 1 >= remaining.length) {
+      return [new Uint8Array(), "", new Error("malformed escape")];
+    }
+
+    const v = remaining[i + 1];
+    if (v === escapedTerm) {
+      // Found terminator: append everything before the escape sequence
+      for (let j = 0; j < i; j++) {
+        result.push(remaining[j]);
+      }
+      // Return the buffer after the terminator
+      const finalRemaining = remaining.slice(i + 2);
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      const str = decoder.decode(new Uint8Array(result));
+      return [finalRemaining, str, undefined];
+    }
+
+    if (v !== escaped00) {
+      return [new Uint8Array(), "", new Error(`unknown escape sequence: ${escape.toString(16)} ${v.toString(16)}`)];
+    }
+
+    // It's an escaped 0x00: append everything before the escape, then append 0x00
+    for (let j = 0; j < i; j++) {
+      result.push(remaining[j]);
+    }
+    result.push(0x00);
+    remaining = remaining.slice(i + 2);
+  }
+}
+
+function decodeUnsafeStringDescending(b: Uint8Array): [Uint8Array, string, Error?] {
+  if (b.length === 0 || b[0] !== bytesDescMarker) {
+    return [b, "", new Error("not a bytes desc marker")];
+  }
+
+  // For descending, we need to invert and then decode
+  const inverted = new Uint8Array(b.length);
+  inverted[0] = bytesMarker; // Convert desc marker to asc marker
+  for (let i = 1; i < b.length; i++) {
+    inverted[i] = 0xff - b[i];
+  }
+
+  const [remaining, str, err] = decodeUnsafeStringAscending(inverted);
+  if (err) return [b, "", err];
+
+  return [b.slice(b.length - remaining.length), str, undefined];
+}
+
+// UndoPrefixEnd implementation matching Go version
+function undoPrefixEnd(b: Uint8Array): [Uint8Array, boolean] {
+  if (b.length === 0 || b[b.length - 1] === 0) {
+    return [new Uint8Array(), false];
+  }
+
+  const out = new Uint8Array(b);
+  out[out.length - 1]--;
+  return [out, true];
+}
+
+// prettyPrintFirstValue implementation matching Go version
+function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, string, Error?] {
+  if (b.length === 0) return [b, "", new Error("empty buffer")];
+
+  const typ = peekType(b);
+
+  switch (typ) {
+    case Type.Null:
+      return [b.slice(1), "NULL", undefined];
+
+    case Type.True:
+      return [b.slice(1), "True", undefined];
+
+    case Type.False:
+      return [b.slice(1), "False", undefined];
+
+    case Type.Array:
+      return [b.slice(1), "Arr", undefined];
+
+    case Type.NotNull:
+      return [b.slice(1), "!NULL", undefined];
+
+    case Type.Int:
+      let [remaining, intVal, err] = (dir === Direction.Descending)
+        ? decodeVarintDescending(b)
+        : decodeVarintAscending(b);
+      if (err) return [b, "", err];
+      return [remaining, intVal.toString(), undefined];
+
+    case Type.Float:
+      // Simplified float handling - just show as hex for now
+      return [b.slice(1), `<float:${b[0].toString(16)}>`, undefined];
+
+    case Type.Decimal:
+      // Simplified decimal handling - just show as hex for now
+      return [b.slice(1), `<decimal:${b[0].toString(16)}>`, undefined];
+
+    case Type.Bytes:
+      if (dir === Direction.Descending) {
+        return [b, "", new Error("descending bytes column dir but ascending bytes encoding")];
+      }
+      let [bytesRemaining, str, bytesErr] = decodeUnsafeStringAscending(b);
+      if (bytesErr) return [b, "", bytesErr];
+      return [bytesRemaining, JSON.stringify(str), undefined];
+
+    case Type.BytesDesc:
+      if (dir === Direction.Ascending) {
+        return [b, "", new Error("ascending bytes column dir but descending bytes encoding")];
+      }
+      let [bytesDescRemaining, descStr, bytesDescErr] = decodeUnsafeStringDescending(b);
+      if (bytesDescErr) return [b, "", bytesDescErr];
+      return [bytesDescRemaining, JSON.stringify(descStr), undefined];
+
+    case Type.Time:
+      // Decode time: skip marker, then decode unix seconds and nanoseconds
+      const timeB = b.slice(1); // skip time marker
+      const [remaining1, sec, err1] = (dir === Direction.Descending)
+        ? decodeVarintDescending(timeB)
+        : decodeVarintAscending(timeB);
+      if (err1) return [b, "", err1];
+
+      const [remaining2, nsec, err2] = (dir === Direction.Descending)
+        ? decodeVarintDescending(remaining1)
+        : decodeVarintAscending(remaining1);
+      if (err2) return [b, "", err2];
+
+      // For descending, invert the values
+      const finalSec = (dir === Direction.Descending) ? ~sec : sec;
+      const finalNsec = (dir === Direction.Descending) ? ~nsec : nsec;
+
+      // Create JavaScript Date from unix timestamp
+      const date = new Date(finalSec * 1000 + finalNsec / 1000000);
+      return [remaining2, date.toISOString(), undefined];
+
+    case Type.Duration:
+      // Simplified duration handling
+      return [b.slice(1), `<duration:${b[0].toString(16)}>`, undefined];
+
+    case Type.BitArray:
+      // Simplified bit array handling
+      return [b.slice(1), `<bitarray:${b[0].toString(16)}>`, undefined];
+
+    default:
+      if (b.length >= 1) {
+        switch (b[0]) {
+          case jsonInvertedIndex:
+            // Skip for now
+            return [b.slice(1), "<json_inverted>", undefined];
+          case jsonEmptyArray:
+            return [b.slice(1), "[]", undefined];
+          case jsonEmptyObject:
+            return [b.slice(1), "{}", undefined];
+          case emptyArray:
+            return [b.slice(1), "[]", undefined];
+        }
+      }
+      // This shouldn't ever happen, but if it does, return an empty slice.
+      // Match Go behavior exactly: return nil, strconv.Quote(string(b)), nil
+      // But check if the data is mostly binary (non-printable) and show as hex instead
+      let printableCount = 0;
+      for (let i = 0; i < Math.min(b.length, 20); i++) {
+        if (b[i] >= 32 && b[i] <= 126) printableCount++;
+      }
+
+      if (printableCount < b.length * 0.3) {
+        // Mostly binary data - show as hex
+        const hexStr = Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+        return [new Uint8Array(), "\\x" + hexStr, undefined];
+      } else {
+        // Mostly printable - quote as string (matching Go behavior)
+        // But handle binary bytes properly by converting to hex when they're not valid UTF-8
+        try {
+          const decoder = new TextDecoder('utf-8', { fatal: true });
+          const str = decoder.decode(b);
+          return [new Uint8Array(), JSON.stringify(str), undefined];
+        } catch {
+          // Not valid UTF-8, show as hex
+          const hexStr = Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+          return [new Uint8Array(), "\\x" + hexStr, undefined];
+        }
+      }
+  }
+}
+
+// prettyPrintValueImpl implementation matching Go version
+function prettyPrintValueImpl(valDirs: Direction[], b: Uint8Array, _sep: string): [string[], boolean] {
+  const result: string[] = [];
+  let allDecoded = true;
+  let currentDirs = [...valDirs];
+
+  while (b.length > 0) {
+    const valDir = currentDirs.length > 0 ? currentDirs.shift()! : Direction.Ascending;
+
+    const [bb, s, err] = prettyPrintFirstValue(valDir, b);
+    if (err) {
+      // If we fail to decode, mark as unknown and attempt
+      // to continue - it's possible we can still decode the
+      // remainder of the key bytes.
+      allDecoded = false;
+      result.push("???");
+      // If we can't decode anything, move forward by 1 byte to try to continue
+      if (bb.length === b.length) {
+        b = b.slice(1);
+      } else {
+        b = bb;
+      }
+    } else {
+      result.push(s);
+      b = bb;
+    }
+  }
+
+  return [result, allDecoded];
+}
+
+// Main PrettyPrintValue implementation matching Go version
+function prettyPrintValue(valDirs: Direction[], b: Uint8Array, sep: string): string {
+  const [parts, allDecoded] = prettyPrintValueImpl(valDirs, b, sep);
+
+  if (allDecoded) {
+    return parts.join(sep);
+  }
+
+  // If we failed to decode everything, try UndoPrefixEnd
+  const [undoPrefixEndBytes, ok] = undoPrefixEnd(b);
+  if (ok) {
+    // Try adding 0xFF bytes up to 20 times
+    const cap = Math.min(20, Math.max(0, valDirs.length - b.length));
+    let tryBytes = new Uint8Array(undoPrefixEndBytes);
+
+    for (let i = 0; i < cap; i++) {
+      const [retryParts, retryAllDecoded] = prettyPrintValueImpl(valDirs, tryBytes, sep);
+      if (retryAllDecoded) {
+        return retryParts.join(sep) + sep + "PrefixEnd";
+      }
+      // Add 0xFF and try again
+      const newTryBytes = new Uint8Array(tryBytes.length + 1);
+      newTryBytes.set(tryBytes);
+      newTryBytes[tryBytes.length] = 0xFF;
+      tryBytes = newTryBytes;
+    }
+  }
+
+  return parts.join(sep);
+}
+
+// DecodeUvarintAscending - exact implementation from Go
+function decodeUvarintAscending(b: Uint8Array): [Uint8Array, number, Error?] {
+  if (b.length === 0) {
+    return [new Uint8Array(), 0, new Error("insufficient bytes to decode uvarint value")];
+  }
+
+  const intZero = 136; // IntMin + intMaxWidth = 128 + 8 = 136
+  const intSmall = 109; // IntMax - intZero - intMaxWidth = 253 - 136 - 8 = 109
+
+  let length = b[0] - intZero;
+  const remaining = b.slice(1); // skip length byte
+
+  if (length <= intSmall) {
+    return [remaining, length, undefined];
+  }
+
+  length -= intSmall;
+  if (length < 0 || length > 8) {
+    return [new Uint8Array(), 0, new Error(`invalid uvarint length of ${length}`)];
+  } else if (remaining.length < length) {
+    return [new Uint8Array(), 0, new Error("insufficient bytes to decode uvarint value")];
+  }
+
+  let v = 0;
+  // It is faster to range over the elements in a slice than to index
+  // into the slice on each loop iteration.
+  for (let i = 0; i < length; i++) {
+    v = (v << 8) | remaining[i];
+  }
+
+  return [remaining.slice(length), v, undefined];
+}
+
+// DecodeVarintAscending - exact implementation from Go
+function decodeVarintAscending(b: Uint8Array): [Uint8Array, number, Error?] {
+  if (b.length === 0) {
+    return [new Uint8Array(), 0, new Error("insufficient bytes to decode varint value")];
+  }
+
+  const intZero = 136; // IntMin + intMaxWidth = 128 + 8 = 136
+
+  let length = b[0] - intZero;
+  if (length < 0) {
+    length = -length;
+    const remB = b.slice(1);
+    if (remB.length < length) {
+      return [new Uint8Array(), 0, new Error("insufficient bytes to decode varint value")];
+    }
+
+    let v = 0;
+    // Use the ones-complement of each encoded byte in order to build
+    // up a positive number, then take the ones-complement again to
+    // arrive at our negative value.
+    for (let i = 0; i < length; i++) {
+      v = (v << 8) | (~remB[i] & 0xFF);
+    }
+
+    return [remB.slice(length), ~v, undefined];
+  }
+
+  // For positive numbers, delegate to DecodeUvarintAscending
+  const [remaining, uv, err] = decodeUvarintAscending(b);
+  if (err) {
+    return [remaining, 0, err];
+  }
+
+  // Check for overflow (JavaScript numbers are safe up to 2^53)
+  if (uv > Number.MAX_SAFE_INTEGER) {
+    return [new Uint8Array(), 0, new Error(`varint ${uv} overflows safe integer`)];
+  }
+
+  return [remaining, uv, undefined];
+}
+
+// Helper function for bytes to string conversion
 function bytesToString(bytes: Uint8Array): string {
   const decoder = new TextDecoder('utf-8', { fatal: false });
   return decoder.decode(bytes);
 }
 
-function decodeTableKey(bytes: Uint8Array, offset: number): DecodedKey | null {
-  if (offset >= bytes.length) return null;
-
-  const parts: KeyPart[] = [];
-  let pos = offset;
-
+// CRDB-specific short key decoding (preserved from original implementation)
+function decodeShortKey(bytes: Uint8Array): DecodedKey | null {
   // Handle empty key
   if (bytes.length === 0) {
     return {
@@ -178,9 +687,33 @@ function decodeTableKey(bytes: Uint8Array, offset: number): DecodedKey | null {
     }
   }
 
+
+  // Check for multi-byte table keys starting with table prefix bytes
+  const firstByte = bytes[0];
+  if ((firstByte >= 0x88 && firstByte <= 0xa5) || (firstByte >= 0xa8 && firstByte <= 0xf5)) {
+    const tableId = firstByte - 0x88;
+
+    // If it's just the table byte alone, it was handled above in single-byte case
+    // If there's more data, we have a table key with additional components
+    if (bytes.length > 1) {
+      // Use Go-style decoding for the remainder after the table ID
+      const remainingBytes = bytes.slice(1);
+      const remainingResult = prettyPrintValue([], remainingBytes, "/");
+
+      return {
+        raw: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+        pretty: `/Table/${tableId}/${remainingResult}`,
+        parts: [
+          { type: 'table', value: tableId, raw: `Table/${tableId}` },
+          { type: 'decoded', value: remainingResult, raw: remainingResult }
+        ]
+      };
+    }
+  }
+
   // Check for meta range keys (0x04)
-  if (bytes[pos] === 0x04) {
-    pos++;
+  if (bytes[0] === 0x04) {
+    let pos = 1;
 
     // Special meta keys
     const remaining = bytes.slice(pos);
@@ -226,7 +759,8 @@ function decodeTableKey(bytes: Uint8Array, offset: number): DecodedKey | null {
     }
 
     if (asciiEnd > pos) {
-      const metaKey = bytesToString(bytes.slice(pos, asciiEnd));
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      const metaKey = decoder.decode(bytes.slice(pos, asciiEnd));
       return {
         raw: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''),
         pretty: `/meta/${metaKey}`,
@@ -235,19 +769,25 @@ function decodeTableKey(bytes: Uint8Array, offset: number): DecodedKey | null {
     }
   }
 
-  // Check for table keys (0x12)
+  // Check for table keys (0x12) - this handles another format of CRDB table keys
+  const parts: KeyPart[] = [];
+  let pos = 0;
+
   if (bytes[pos] === 0x12) {
     pos++;
-    const [tableId, newPos] = readVarint(bytes, pos);
-    pos = newPos;
+
+    const [remaining1, tableId, err1] = decodeUvarintAscending(bytes.slice(pos));
+    if (err1) throw err1;
+    pos = bytes.length - remaining1.length;
 
     const tableName = SYSTEM_TABLES[tableId] || `Table${tableId}`;
     parts.push({ type: 'table', value: tableId, raw: tableName });
 
     if (pos < bytes.length && bytes[pos] === 0x13) {
       pos++;
-      const [indexId, newPos2] = readVarint(bytes, pos);
-      pos = newPos2;
+      const [remaining2, indexId, err2] = decodeUvarintAscending(bytes.slice(pos));
+      if (err2) throw err2;
+      pos = bytes.length - remaining2.length;
       parts.push({ type: 'index', value: indexId });
 
       while (pos < bytes.length && bytes[pos] === 0x12) {
@@ -262,33 +802,32 @@ function decodeTableKey(bytes: Uint8Array, offset: number): DecodedKey | null {
     }
   }
 
-  if (parts.length === 0) return null;
+  if (parts.length > 0) {
+    const prettyParts = parts.map(p => {
+      switch (p.type) {
+        case 'meta': return `/${p.raw}`;
+        case 'table': return `/${p.raw}`;
+        case 'index': return `/Index${p.value}`;
+        case 'column': return `/${p.value}`;
+        default: return `/${p.value}`;
+      }
+    });
 
-  const prettyParts = parts.map(p => {
-    switch (p.type) {
-      case 'meta': return `/${p.raw}`;
-      case 'table': return `/${p.raw}`;
-      case 'index': return `/Index${p.value}`;
-      case 'column': return `/${p.value}`;
-      default: return `/${p.value}`;
-    }
-  });
+    return {
+      raw: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''),
+      pretty: prettyParts.join(''),
+      parts
+    };
+  }
 
-  return {
-    raw: Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''),
-    pretty: prettyParts.join(''),
-    parts
-  };
+  return null; // Not a recognized short key
 }
 
 export function prettyKey(hexString: string): DecodedKey {
-  const originalValue = hexString;
-
   // Handle \x prefix (PostgreSQL/CRDB hex format)
-  // Replace all \x occurrences, not just the first one
   hexString = hexString.replace(/\\x/gi, '').replace(/^0x/i, '').replace(/\s/g, '');
 
-  // Handle empty key (just \x or empty string)
+  // Handle empty key
   if (hexString.length === 0) {
     return {
       raw: '',
@@ -310,19 +849,46 @@ export function prettyKey(hexString: string): DecodedKey {
     bytes[i / 2] = parseInt(hexString.substring(i, i + 2), 16);
   }
 
-  const decoded = decodeTableKey(bytes, 0);
-  if (decoded) {
-    return decoded;
+  // First try the CRDB-specific short key decoding
+  const shortKeyResult = decodeShortKey(bytes);
+  if (shortKeyResult) {
+    return shortKeyResult;
   }
 
-  const asciiChars = Array.from(bytes)
-    .map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : '.')
-    .join('');
+  // Use the Go-style pretty printing for complex keys
+  const prettyResult = prettyPrintValue([], bytes, "/");
 
+  // Check if we got a result that contains undecoded data (???)
+  if (prettyResult && prettyResult.includes("???")) {
+    // We have partially decoded data - the ??? indicates where decoding failed
+    // Replace ??? with hex representation of remaining data
+    const cleanResult = prettyResult.replace(/\/\?\?\?.*$/, ''); // Remove ??? and everything after
+    const hexSuffix = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return {
+      raw: hexString,
+      pretty: "/" + cleanResult + "/\\x" + hexSuffix,
+      parts: [
+        { type: 'partial', value: cleanResult, raw: cleanResult },
+        { type: 'hex', value: hexSuffix, raw: hexSuffix }
+      ]
+    };
+  }
+
+  // If we got a meaningful result without any undecoded parts, use it
+  if (prettyResult && prettyResult !== "???") {
+    return {
+      raw: hexString,
+      pretty: "/" + prettyResult,
+      parts: [{ type: 'decoded', value: prettyResult, raw: prettyResult }]
+    };
+  }
+
+  // Complete fallback: couldn't decode anything meaningful
+  // Return the hex representation to ensure no data is lost
   return {
     raw: hexString,
-    pretty: asciiChars.includes('.') ? originalValue : asciiChars,
-    parts: []
+    pretty: "\\x" + hexString,
+    parts: [{ type: 'hex', value: hexString, raw: hexString }]
   };
 }
 
@@ -332,7 +898,6 @@ export function isProbablyHexKey(value: string): boolean {
   // Handle \x prefix (PostgreSQL/CRDB hex format) - always treat as hex
   if (value.startsWith('\\x')) {
     const cleaned = value.replace(/^\\x/i, '').replace(/\s/g, '');
-    // Even empty \x or single bytes with \x prefix are valid keys
     return cleaned.length >= 0 && cleaned.length % 2 === 0 && /^[0-9a-fA-F]*$/.test(cleaned);
   }
 

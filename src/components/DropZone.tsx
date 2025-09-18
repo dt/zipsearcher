@@ -225,6 +225,27 @@ function DropZone() {
     }
   };
 
+  const loadDemoFile = useCallback(async () => {
+    setLoading(true);
+    setLoadingMessage('Loading demo file...');
+    setError(null);
+
+    try {
+      // Use relative path that works in both dev and production
+      const response = await fetch(`${import.meta.env.BASE_URL}debug.zip`);
+      if (!response.ok) {
+        throw new Error('Failed to load demo file');
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const file = new File([arrayBuffer], 'debug.zip', { type: 'application/zip' });
+      handleFile(file);
+    } catch (err) {
+      console.error('Failed to load demo file:', err);
+      setError(`Failed to load demo file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setLoading(false);
+    }
+  }, []);
+
   return (
     <div
       className={`drop-zone ${isDragging ? 'dragover' : ''}`}
@@ -260,6 +281,24 @@ function DropZone() {
           <>
             <h2>📦 Drop debug.zip here</h2>
             <p>or click to browse</p>
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadDemoFile();
+                }}
+                style={{
+                  fontSize: '0.9rem',
+                  padding: '0.5rem 1rem',
+                  background: 'var(--accent-muted)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)'
+                }}
+              >
+                🚀 Try Demo File
+              </button>
+            </div>
           </>
         )}
       </div>
