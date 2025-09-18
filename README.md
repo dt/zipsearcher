@@ -1,6 +1,35 @@
-# React + TypeScript + Vite
+# ZipSearcher - CRDB Explorer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web application for exploring CockroachDB debug zip files with DuckDB-powered SQL queries.
+
+## Features
+
+- Load and explore CockroachDB debug zip files
+- SQL querying with DuckDB WASM
+- Monaco Editor for SQL editing
+- File tree navigation
+- Protobuf decoding for CRDB internal data
+- Key decoding and prettification
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+## Building
+
+```bash
+npm run build
+```
+
+## GitHub Pages Deployment
+
+The project is configured to automatically deploy to GitHub Pages on pushes to the main branch.
+
+- **Live Demo**: Will be available at `https://<username>.github.io/zipsearcher/`
+- **Manual Deploy**: `npm run build:pages` (builds with production base path)
 
 Currently, two official plugins are available:
 

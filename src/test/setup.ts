@@ -1,4 +1,5 @@
 import { expect, afterEach, vi } from 'vitest';
+import '@testing-library/jest-dom';
 
 // 1) fetch for Node
 import { fetch, Headers, Request, Response } from 'undici'

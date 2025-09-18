@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 test-results
+
+# Build artifacts - debug.zip gets copied to public/ during build
+public/debug.zip
+playwright-report/
