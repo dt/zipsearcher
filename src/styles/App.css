@@ -94,14 +94,14 @@ body {
 
 /* Sidebar (Tier B) */
 .sidebar {
-  width: var(--sidebar-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: left;
+  flex-shrink: 0;
 }
 
 .sidebar.collapsed {
@@ -133,6 +133,29 @@ body {
   padding: 10px;
 }
 
+/* Sidebar Resize Handle */
+.sidebar-resize-handle {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sidebar-resize-handle:hover {
+  background: var(--accent-primary);
+}
+
+.sidebar-resize-handle::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  background: transparent;
+}
+
 /* Main Panel (Tier C) */
 .main-panel {
   flex: 1;
@@ -159,6 +182,7 @@ body {
 .tab {
   min-width: 120px;
   max-width: 400px;
+  flex: 1;
   height: 100%;
   padding: 0 12px;
   background: var(--bg-tertiary);

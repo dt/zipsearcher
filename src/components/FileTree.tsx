@@ -207,7 +207,7 @@ function FileTree({ entries, filter }: FileTreeProps) {
         <div
           ref={isFile && node.entry ? (el) => registerElement(`file-${node.entry.id}`, el) : undefined}
           className={`tree-item ${isFile ? 'file' : 'folder'} ${isExpanded ? 'expanded' : ''} ${isHighlighted ? 'keyboard-highlighted' : ''}`}
-          style={{ paddingLeft: `${level * 20 + 8}px` }}
+          style={{ paddingLeft: `${level * 12 + 4}px` }}
           onClick={() => {
             if (isFile && node.entry) {
               handleFileClick(node.entry);
@@ -221,7 +221,7 @@ function FileTree({ entries, filter }: FileTreeProps) {
               {isExpanded ? '▼' : '▶'}
             </span>
           )}
-          <span className="tree-label">{node.name}</span>
+          <span className="tree-label" title={node.path || node.name}>{node.name}</span>
           {isFile && node.entry && (
             <span className="tree-size">
               {formatFileSize(node.entry.size)}

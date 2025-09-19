@@ -56,6 +56,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'OPEN_NEW_FILE_TAB': {
+      // Check if a tab for this file already exists
+      const existingTab = state.openTabs.find(tab =>
+        tab.kind === 'file' && tab.fileId === action.fileId
+      );
+
+      if (existingTab) {
+        // Activate existing tab instead of creating duplicate
+        return {
+          ...state,
+          activeTabId: existingTab.id,
+        };
+      }
+
       // Generate a unique ID for this new tab instance
       const timestamp = Date.now();
       const uniqueId = `${action.fileId}_${timestamp}`;

@@ -7,9 +7,10 @@ import { useApp } from '../state/AppContext';
 interface SidebarProps {
   activeView: 'files' | 'tables' | 'search';
   isVisible: boolean;
+  width: number;
 }
 
-function Sidebar({ activeView, isVisible }: SidebarProps) {
+function Sidebar({ activeView, isVisible, width }: SidebarProps) {
   const { state } = useApp();
 
   // Calculate loading progress for tables view
@@ -51,7 +52,10 @@ function Sidebar({ activeView, isVisible }: SidebarProps) {
   };
 
   return (
-    <div className={`sidebar ${!isVisible ? 'collapsed' : ''}`}>
+    <div
+      className={`sidebar ${!isVisible ? 'collapsed' : ''}`}
+      style={{ width: isVisible ? `${width}px` : 0 }}
+    >
       <div className="sidebar-header">
         <span>{getTitle()}</span>
         {tablesProgress && (

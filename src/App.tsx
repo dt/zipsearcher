@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import './styles/global.css';
 import './styles/App.css';
 import './styles/crdb.css';
@@ -17,8 +17,11 @@ type ActiveView = 'files' | 'tables' | 'search';
 function AppContent() {
   const [activeView, setActiveView] = useState<ActiveView>('tables');
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(360);
+  const [isDragging, setIsDragging] = useState(false);
   const { state, dispatch } = useApp();
   const navigation = useKeyboardNavigation();
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const handleViewChange = (view: ActiveView) => {
     if (view === activeView && sidebarVisible) {
@@ -92,6 +95,51 @@ function AppContent() {
     }
   }, [state.openTabs, dispatch]);
 
+  // Sidebar resize functionality
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startWidth: sidebarWidth
+    };
+  }, [sidebarWidth]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !dragRef.current) return;
+
+    const deltaX = e.clientX - dragRef.current.startX;
+    const newWidth = Math.max(200, Math.min(600, dragRef.current.startWidth + deltaX));
+    setSidebarWidth(newWidth);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    dragRef.current = null;
+  }, []);
+
+  // Add global mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
   useKeyboardShortcuts([
     { key: '/', handler: focusFilterInput },
     { key: 'b', cmd: true, handler: toggleSidebar },
@@ -114,7 +162,17 @@ function AppContent() {
   return (
     <div className={`app-container ${!sidebarVisible ? 'sidebar-collapsed' : ''}`}>
       <IconRail activeView={activeView} onViewChange={handleViewChange} />
-      <Sidebar activeView={activeView} isVisible={sidebarVisible} />
+      <Sidebar
+        activeView={activeView}
+        isVisible={sidebarVisible}
+        width={sidebarWidth}
+      />
+      {sidebarVisible && (
+        <div
+          className="sidebar-resize-handle"
+          onMouseDown={handleMouseDown}
+        />
+      )}
       <MainPanel />
     </div>
   );

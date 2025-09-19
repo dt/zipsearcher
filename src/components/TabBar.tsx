@@ -72,7 +72,7 @@ function TabBar() {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span className="tab-title">{tab.title}</span>
+            <span className="tab-title" title={tab.title}>{tab.title}</span>
           )}
           <button
             className="tab-close"

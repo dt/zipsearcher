@@ -208,6 +208,73 @@ function resolveQualifierToTable(
   return undefined;
 }
 
+export async function setupLogLanguage(monaco: Monaco) {
+  // Register log file language
+  monaco.languages.register({ id: 'log' });
+
+  // Define log syntax highlighting for CRDB format
+  // Format: I250808 06:44:26.929973 686 2@util/log/event_log.go:39 ⋮ [T1,Vsystem,n40] 133464 Balh
+  monaco.languages.setMonarchTokensProvider('log', {
+    defaultToken: '',
+    tokenPostfix: '.log',
+    ignoreCase: false,
+
+    tokenizer: {
+      root: [
+        // Simplified approach - use individual patterns without massive capture groups
+        [/^[IWEF]/, { cases: {
+          'I': 'log.level.I',
+          'W': 'log.level.W',
+          'E': 'log.level.E',
+          'F': 'log.level.F',
+          '@default': 'log.level'
+        }}],
+        [/\d{6}\s+\d{2}:\d{2}:\d{2}/, 'log.datetime'],
+        [/\.\d{6}/, 'log.fractional'],
+        [/\s+\d+(?=\s)/, 'log.pid'],
+        [/\d+@/, 'log.goroutine'],
+        [/[\w\/\.\-_]+\.go/, 'log.file'],
+        [/:\d+/, 'log.line'],
+        [/⋮/, 'log.separator'],
+        [/\[[^\]]+\]/, 'log.tags'],
+        [/\s+\d+(?=\s+\w)/, 'log.counter'],
+        [/\s+/, 'white'],
+        [/./, 'log.message'],
+      ]
+    }
+  });
+
+  // Define colors for log tokens
+  monaco.editor.defineTheme('log-theme', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'log.level.I', foreground: '98FB98' }, // Green for I (Info)
+      { token: 'log.level.W', foreground: 'F0E68C' }, // Yellow for W (Warning)
+      { token: 'log.level.E', foreground: 'FF6B6B' }, // Red for E (Error)
+      { token: 'log.level.F', foreground: 'FF6B6B' }, // Red for F (Fatal)
+      { token: 'log.level', foreground: '555555' }, // Fallback for other levels
+      { token: 'log.datetime', foreground: '87CEEB', fontStyle: 'bold' }, // Sky blue, bold for date+time together
+      { token: 'log.fractional', foreground: '777777' }, // Dim for fractional seconds
+      { token: 'log.pid', foreground: '6A9955' }, // Comment green for PID
+      { token: 'log.goroutine', foreground: '999999' }, // Slightly lighter gray than fractional seconds
+      { token: 'log.file', foreground: '6495ED' }, // Darker blue for file path
+      { token: 'log.line', foreground: 'B0B0B0' }, // Light gray for line number
+      { token: 'log.separator', foreground: '696969' }, // Dim gray for separators
+      { token: 'log.bracket', foreground: 'F0E68C' }, // Khaki for brackets
+      { token: 'log.tags', foreground: 'DDA0DD' }, // Purple/fuscia for tag content
+      { token: 'log.counter', foreground: '444444' }, // Very dim for counter (de-emphasized)
+      { token: 'log.message', foreground: 'FFFFFF' }, // White for message text
+    ],
+    colors: {
+      'editor.findMatchBackground': 'transparent',
+      'editor.findMatchHighlightBackground': 'transparent',
+      'editor.findRangeHighlightBackground': 'transparent',
+      'editor.selectionHighlightBackground': 'transparent'
+    }
+  });
+}
+
 export async function setupDuckDBLanguage(monaco: Monaco) {
   // Register DuckDB SQL as a custom language
   monaco.languages.register({ id: 'duckdb-sql' });

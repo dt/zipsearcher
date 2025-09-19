@@ -37,8 +37,9 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
         if (matchesKey && matchesCtrl && matchesCmd && matchesShift && matchesAlt) {
           // For "/" shortcut, only trigger if not already in a search/filter input
           if (isSlashShortcut) {
-            if (isTyping && !target.classList.contains('filter-input') &&
-                !target.classList.contains('search-input')) {
+            if (isTyping && (target.classList.contains('filter-input') ||
+                            target.classList.contains('search-input'))) {
+              // We're already in a filter/search input, let the '/' character be typed normally
               continue;
             }
           } else if (isTyping && !shortcut.ctrl && !shortcut.cmd) {

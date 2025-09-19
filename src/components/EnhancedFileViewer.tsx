@@ -5,6 +5,7 @@ import type { ViewerTab } from '../state/types';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { matchesFilter } from '../utils/filterUtils';
 import { useApp } from '../state/AppContext';
+import { setupLogLanguage } from '../services/monacoConfig';
 
 interface FileViewerProps {
   tab: ViewerTab & { kind: 'file' };
@@ -23,7 +24,7 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 function EnhancedFileViewer({ tab }: FileViewerProps) {
-  const { dispatch } = useApp();
+  const { dispatch, state } = useApp();
 
   // File loading state
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,13 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
   const abortRef = useRef<(() => void) | null>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const decorationIds = useRef<string[]>([]);
+  const languageRef = useRef<string>('plaintext');
+  const initialFilterRef = useRef<{ text: string; context: number } | null>(null);
+  const applyFilterRef = useRef<((query: string, context?: number) => void) | null>(null);
+
+  // Get original filename from filesIndex (never changes, unaffected by tab renaming)
+  const originalFile = state.filesIndex[tab.fileId];
+  const originalFileName = originalFile?.path || originalFile?.name || tab.title;
 
   // Detect file type and language
   const getLanguage = useCallback((fileName: string): string => {
@@ -112,7 +120,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
       'gql': 'graphql',
       'diff': 'diff',
       'patch': 'diff',
-      'log': 'plaintext',
+      'log': 'log',
       'txt': 'plaintext',
       'text': 'plaintext',
       'csv': 'plaintext',
@@ -122,7 +130,16 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
     return languageMap[ext || ''] || 'plaintext';
   }, []);
 
-  const language = getLanguage(tab.title);
+  const language = getLanguage(originalFileName);
+  languageRef.current = language; // Keep ref in sync
+
+  // Store initial filter state
+  if (filterText) {
+    initialFilterRef.current = { text: filterText, context: contextLines };
+  }
+
+  // DEBUG: Uncomment to test with different language
+  // const language = 'javascript'; // Force javascript highlighting for testing
 
   // Apply filter/grep functionality
   const applyFilter = useCallback((query: string, context: number = 0) => {
@@ -134,6 +151,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
     if (!model) {
       return;
     }
+
 
     // Reset if empty
     if (!query) {
@@ -220,6 +238,9 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
       editorRef.current.revealRangeNearTop(matchingLines[0].range);
     }*/
   }, []);
+
+  // Keep applyFilter ref in sync
+  applyFilterRef.current = applyFilter;
 
   // Update tab title when filter changes
   const updateTabTitle = useCallback((filterText: string) => {
@@ -312,27 +333,43 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
     };
   }, []);
 
-  const handleBeforeMount = useCallback(() => {
-    // The folding contribution is already available in Monaco
-  }, []);
+  const handleBeforeMount = useCallback((monaco: Monaco) => {
+    // Setup log language if this is a log file
+    if (languageRef.current === 'log') {
+      setupLogLanguage(monaco);
+    }
+  }, []); // No dependencies - stable callback
 
   const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
+    const model = editor.getModel();
+    if (model) {
+      // Force set the language if it's wrong
+      if (languageRef.current === 'log' && model.getLanguageId() !== 'log') {
+        monaco.editor.setModelLanguage(model, 'log');
+      }
+    }
+
     // Format JSON files
-    if (language === 'json' && content) {
-      try {
-        const parsed = JSON.parse(content);
-        const formatted = JSON.stringify(parsed, null, 2);
-        editor.setValue(formatted);
-      } catch {
-        // Not valid JSON, leave as is
+    if (languageRef.current === 'json') {
+      const currentContent = editor.getValue();
+      if (currentContent) {
+        try {
+          const parsed = JSON.parse(currentContent);
+          const formatted = JSON.stringify(parsed, null, 2);
+          if (formatted !== currentContent) {
+            editor.setValue(formatted);
+          }
+        } catch {
+          // Not valid JSON, leave as is
+        }
       }
     }
 
     // Configure JSON validation
-    if (language === 'json') {
+    if (languageRef.current === 'json') {
       monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
         validate: true,
         schemas: [],
@@ -342,7 +379,6 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
     }
 
     // Set initial line counts
-    const model = editor.getModel();
     if (model) {
       const lineCount = model.getLineCount();
       setTotalLineCount(lineCount);
@@ -350,10 +386,12 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
     }
 
     // Apply initial filter if any
-    if (filterText) {
-      applyFilter(filterText, contextLines);
+    if (initialFilterRef.current && applyFilterRef.current) {
+      const { text, context } = initialFilterRef.current;
+      applyFilterRef.current(text, context);
+      initialFilterRef.current = null; // Clear after use
     }
-  }, [language, content, filterText, contextLines, applyFilter]);
+  }, []); // No dependencies - stable callback that accesses current state via refs
 
   // Note: We don't need to update content when using defaultValue + keepCurrentModel
   // because the model is stable and content updates would clear hidden areas
@@ -476,7 +514,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
         defaultValue={content}
         path={tab.fileId} // stable path for the model
         keepCurrentModel={true}
-        theme="vs-dark"
+        theme={language === 'log' ? 'log-theme' : 'vs-dark'}
         beforeMount={handleBeforeMount}
         onMount={handleEditorDidMount}
         options={{
@@ -527,6 +565,11 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
           smoothScrolling: true,
           cursorBlinking: 'blink',
           cursorSmoothCaretAnimation: 'on',
+          // Disable unicode ambiguous character warnings for log files
+          unicodeHighlight: {
+            ambiguousCharacters: language === 'log' ? false : true,
+            invisibleCharacters: language === 'log' ? false : true
+          },
           // Search settings
           find: {
             seedSearchStringFromSelection: 'always',
