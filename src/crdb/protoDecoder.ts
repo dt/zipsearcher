@@ -36,7 +36,7 @@ export class ProtoDecoder {
 
     try {
       // Load the REAL CRDB descriptor set - NO FALLBACK
-      const response = await fetch('/crdb_jobs_complete.pb');
+      const response = await fetch('./crdb_jobs_complete.pb');
       if (!response.ok) {
         throw new Error('CRDB descriptor file not found - cannot decode protos without it');
       }
