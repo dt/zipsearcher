@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [react()],
   base: process.env.NODE_ENV === 'production' ? './' : '/',
   build: {
-    minify: false,
+    minify: process.env.NODE_ENV === 'production',
+    sourcemap: false, // Disable source maps to prevent 404s for .js.map files
     // Ensure proper asset handling for GitHub Pages
     assetsDir: 'assets',
     rollupOptions: {
