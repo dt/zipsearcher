@@ -127,14 +127,6 @@ export function preprocessCSV(
     }
   });
 
-  // Temporary debug logging for contention events
-  if (options.tableName.toLowerCase().includes('contention')) {
-    console.log(`DEBUG: Preprocessing ${options.tableName}`);
-    console.log(`DEBUG: decodeKeys = ${options.decodeKeys}`);
-    console.log(`DEBUG: headers = ${headers.join(', ')}`);
-    console.log(`DEBUG: keyColumns = ${Array.from(keyColumns)}`);
-    console.log(`DEBUG: columnInfo = ${columnInfo.join(', ')}`);
-  }
 
   // Debug: Check if we found the config column for span_configurations
   if (options.tableName.toLowerCase().includes('span_config') && protoColumns.size === 0) {
@@ -165,13 +157,6 @@ export function preprocessCSV(
         if (value !== undefined && value !== null) {
           if (value === '\\x' || value.startsWith('\\x') || isProbablyHexKey(value)) {
             const decoded = prettyKey(value);
-            // Debug logging for contention events
-            if (options.tableName.toLowerCase().includes('contention') && rowIndex === 0) {
-              console.log(`DEBUG: Key transformation - original: ${value.substring(0, 50)}...`);
-              console.log(`DEBUG: Key transformation - pretty: ${decoded.pretty}`);
-              console.log(`DEBUG: Key transformation - parts:`, decoded.parts);
-              console.log(`DEBUG: First byte: 0x${value.substring(2, 4)}`);
-            }
             return decoded.pretty;
           }
         }
