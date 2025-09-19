@@ -47,10 +47,6 @@ jobs:
         run: |
           mkdir -p deploy
           cp -r dist/* deploy/
-          echo "Files in deploy directory:"
-          ls -la deploy/
-          echo "Looking for .pb files:"
-          find deploy/ -name "*.pb" -ls
 
       - name: Setup Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
