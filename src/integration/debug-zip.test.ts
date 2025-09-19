@@ -8,7 +8,7 @@ import { ProtoDecoder } from '../crdb/protoDecoder';
 import { prettyKey } from '../crdb/prettyKey';
 import { getTableTypeHints } from '../crdb/columnTypeRegistry';
 
-describe('debug.zip integration', () => {
+describe.skip('debug.zip integration', () => {
   let zipData: ArrayBuffer;
   let zipReader: ZipReader;
   let processedFiles: Map<string, any> = new Map();

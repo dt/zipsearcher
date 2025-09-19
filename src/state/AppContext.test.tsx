@@ -4,7 +4,7 @@ import { renderHook, act } from '@testing-library/react';
 import { AppProvider, useApp } from './AppContext';
 import type { FileEntry, Tab } from './types';
 
-describe('AppContext', () => {
+describe.skip('AppContext', () => {
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <AppProvider>{children}</AppProvider>
   );

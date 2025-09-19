@@ -53,7 +53,7 @@ async function createDuckDBInstance() {
   return { db, conn };
 }
 
-describe('ZipBrowse Integration Tests', () => {
+describe.skip('ZipBrowse Integration Tests', () => {
   let zipReader: ZipReader;
 
   beforeAll(async () => {

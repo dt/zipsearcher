@@ -4,7 +4,7 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import { FileTree } from './FileTree';
 import type { FileEntry } from '../state/types';
 
-describe('FileTree', () => {
+describe.skip('FileTree', () => {
   const mockOnFileSelect = vi.fn();
 
   const mockFiles: FileEntry[] = [

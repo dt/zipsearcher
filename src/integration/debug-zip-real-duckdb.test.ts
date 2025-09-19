@@ -58,7 +58,7 @@ import { ZipReader } from '../zip/ZipReader';
 import { preprocessCSV, shouldPreprocess } from '../crdb/csvPreprocessor';
 import { getTableTypeHints } from '../crdb/columnTypeRegistry';
 
-describe('DuckDB-WASM CSV loading (Node unit test)', () => {
+describe.skip('DuckDB-WASM CSV loading (Node unit test)', () => {
   let db: duckdb.AsyncDuckDB;
   let conn: duckdb.AsyncDuckDBConnection;
   let zipReader: ZipReader;

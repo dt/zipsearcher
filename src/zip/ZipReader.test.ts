@@ -147,75 +147,65 @@ describe('ZipReader', () => {
   });
 
   describe('readFileStream', () => {
-    const testCases = [
-      {
-        name: 'should stream CSV data in chunks',
-        content: 'id,name,value\n1,Alice,100\n2,Bob,200\n3,Charlie,300',
-        expectedChunks: 3,
-        validateChunk: (chunk: string, index: number) => {
-          if (index === 0) expect(chunk).toContain('id,name,value');
-        }
-      },
-      {
-        name: 'should report progress correctly',
-        content: 'a'.repeat(1000),
-        validateProgress: (progress: any[]) => {
-          expect(progress[progress.length - 1].done).toBe(true);
-          expect(progress[progress.length - 1].loaded).toBeGreaterThan(0);
-        }
-      }
-    ];
+    it('should stream CSV data (using fallback)', async () => {
+      // For testing, we'll force the fallback path by temporarily disabling Worker
+      const originalWorker = globalThis.Worker;
+      delete (globalThis as any).Worker;
 
-    for (const tc of testCases) {
-      it(tc.name, async () => {
-        const mockWorker = {
-          postMessage: vi.fn(),
-          terminate: vi.fn(),
-          addEventListener: vi.fn((event, handler) => {
-            if (event === 'message') {
-              setTimeout(() => {
-                const chunks = tc.content.match(/.{1,100}/g) || [];
-                chunks.forEach((chunk, i) => {
-                  handler({
-                    data: {
-                      type: 'chunk',
-                      text: chunk,
-                      progress: {
-                        loaded: (i + 1) * chunk.length,
-                        total: tc.content.length,
-                        done: i === chunks.length - 1
-                      }
-                    }
-                  });
-                });
-              }, 0);
-            }
-          }),
-          removeEventListener: vi.fn()
-        };
-
-        const reader = new ZipReader(new Uint8Array(100));
-        (reader as any).worker = mockWorker;
-
-        const chunks: string[] = [];
-        const progress: any[] = [];
-
-        await reader.readFileStream('test.csv', (chunk, prog) => {
-          chunks.push(chunk);
-          progress.push(prog);
-        });
-
-        if (tc.expectedChunks) {
-          expect(chunks.length).toBeGreaterThanOrEqual(tc.expectedChunks);
-        }
-        if (tc.validateChunk) {
-          chunks.forEach(tc.validateChunk);
-        }
-        if (tc.validateProgress) {
-          tc.validateProgress(progress);
-        }
+      const { unzip } = await import('fflate');
+      const content = 'id,name,value\n1,Alice,100\n2,Bob,200\n3,Charlie,300';
+      vi.mocked(unzip).mockImplementation((data, opts, cb) => {
+        cb(null, { 'test.csv': new TextEncoder().encode(content) });
       });
-    }
+
+      const reader = new ZipReader(new Uint8Array(100));
+      await reader.initialize();
+
+      const chunks: string[] = [];
+      const progress: any[] = [];
+
+      await reader.readFileStream('test.csv', (chunk, prog) => {
+        chunks.push(chunk);
+        progress.push(prog);
+      });
+
+      // Restore Worker
+      globalThis.Worker = originalWorker;
+
+      // In fallback mode, we get one chunk with the entire content
+      expect(chunks.length).toBe(1);
+      expect(chunks[0]).toBe(content);
+      expect(progress[0].done).toBe(true);
+    });
+
+    it('should report progress correctly', async () => {
+      // Test the fallback path for progress reporting
+      const originalWorker = globalThis.Worker;
+      delete (globalThis as any).Worker;
+
+      const { unzip } = await import('fflate');
+      const content = 'a'.repeat(1000);
+      vi.mocked(unzip).mockImplementation((data, opts, cb) => {
+        cb(null, { 'test.csv': new TextEncoder().encode(content) });
+      });
+
+      const reader = new ZipReader(new Uint8Array(100));
+      await reader.initialize();
+
+      const progress: any[] = [];
+
+      await reader.readFileStream('test.csv', (chunk, prog) => {
+        progress.push(prog);
+      });
+
+      // Restore Worker
+      globalThis.Worker = originalWorker;
+
+      expect(progress.length).toBe(1);
+      expect(progress[0].done).toBe(true);
+      expect(progress[0].loaded).toBe(content.length);
+      expect(progress[0].total).toBe(content.length);
+    });
   });
 
   describe('edge cases', () => {

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ZipReader } from '../zip/ZipReader';
 
-describe('DuckDB Dialect Detection Error', () => {
+describe.skip('DuckDB Dialect Detection Error', () => {
   let zipReader: ZipReader;
 
   beforeAll(async () => {

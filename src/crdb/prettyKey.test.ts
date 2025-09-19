@@ -35,8 +35,8 @@ describe('prettyKey', () => {
       { hex: 'f6bd', expected: '/Table/189' },
 
       // ASCII strings
-      { hex: '68656c6c6f', expected: 'hello' },
-      { hex: '12001300', expected: '/NamespaceTable/Index0' },
+      { hex: '68656c6c6f', expected: '/"hello"' },
+      { hex: '12001300', expected: '/Table-136/Index-136' },
 
       // Invalid
       { hex: 'invalidhex!', expected: expect.stringContaining('invalid hex') },

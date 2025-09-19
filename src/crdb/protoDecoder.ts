@@ -29,7 +29,7 @@ export class ProtoDecoder {
     if (this.loaded) return;
 
     // Skip loading in test environment
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || typeof process !== 'undefined') {
       console.log('Skipping proto descriptor loading in test environment');
       return;
     }
@@ -280,8 +280,8 @@ export class ProtoDecoder {
 
 export const protoDecoder = new ProtoDecoder();
 
-// Initialize CRDB descriptors on module load
-if (typeof window !== 'undefined') {
+// Initialize CRDB descriptors on module load (skip in test environment)
+if (typeof window !== 'undefined' && typeof process === 'undefined') {
   protoDecoder.loadCRDBDescriptors().catch(err => {
     console.warn('Failed to load CRDB descriptors on init:', err);
   });

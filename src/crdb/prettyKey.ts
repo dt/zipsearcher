@@ -86,6 +86,14 @@ const IntMax = 0xfd; // 253
 const encodedNotNullDesc = 0xfe;
 const encodedNullDesc = 0xff;
 
+// Array key terminators
+const arrayKeyTerminator = 0x00;
+const arrayKeyDescendingTerminator = 0xff;
+
+// Null encodings within array keys
+const ascendingNullWithinArrayKey = 0x01;
+const descendingNullWithinArrayKey = 0xfe;
+
 // CRDB System Tables (preserved from original implementation)
 const SYSTEM_TABLES: Record<number, string> = {
   0: 'NamespaceTable',
@@ -325,6 +333,250 @@ function undoPrefixEnd(b: Uint8Array): [Uint8Array, boolean] {
   return [out, true];
 }
 
+// Float decoding functions - exact implementations from Go float.go
+function decodeFloatAscending(buf: Uint8Array): [Uint8Array, number, Error?] {
+  if (peekType(buf) !== Type.Float) {
+    return [buf, 0, new Error("did not find marker")];
+  }
+
+  switch (buf[0]) {
+    case floatNaN:
+    case floatNaNDesc:
+      return [buf.slice(1), NaN, undefined];
+    case floatNeg:
+      const [b1, u1, err1] = decodeUint64Ascending(buf.slice(1));
+      if (err1) return [b1, 0, err1];
+      const inverted = ~u1;
+      // Convert uint64 to float64 bits
+      const view = new DataView(new ArrayBuffer(8));
+      view.setBigUint64(0, BigInt(inverted), false); // big-endian
+      const floatVal1 = view.getFloat64(0, false);
+      return [b1, floatVal1, undefined];
+    case floatZero:
+      return [buf.slice(1), 0, undefined];
+    case floatPos:
+      const [b2, u2, err2] = decodeUint64Ascending(buf.slice(1));
+      if (err2) return [b2, 0, err2];
+      // Convert uint64 to float64 bits
+      const view2 = new DataView(new ArrayBuffer(8));
+      view2.setBigUint64(0, BigInt(u2), false); // big-endian
+      const floatVal2 = view2.getFloat64(0, false);
+      return [b2, floatVal2, undefined];
+    default:
+      return [new Uint8Array(), 0, new Error(`unknown prefix of the encoded byte slice: ${buf[0]}`)];
+  }
+}
+
+function decodeFloatDescending(buf: Uint8Array): [Uint8Array, number, Error?] {
+  const [b, r, err] = decodeFloatAscending(buf);
+  if (r !== 0 && !isNaN(r)) {
+    return [b, -r, err];
+  }
+  return [b, r, err];
+}
+
+// Basic decimal decoding - handles simple cases correctly, complex cases as approximations
+function decodeDecimalAscending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  return decodeDecimal(buf, false);
+}
+
+function decodeDecimalDescending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  return decodeDecimal(buf, true);
+}
+
+function decodeDecimal(buf: Uint8Array, invert: boolean): [Uint8Array, string, Error?] {
+  if (buf.length === 0) {
+    return [buf, "", new Error("insufficient bytes to decode decimal")];
+  }
+
+  // Handle the simplistic cases first
+  switch (buf[0]) {
+    case decimalNaN:
+    case decimalNaNDesc:
+      return [buf.slice(1), "NaN", undefined];
+    case decimalInfinity:
+      return [buf.slice(1), invert ? "-Infinity" : "Infinity", undefined];
+    case decimalNegativeInfinity:
+      return [buf.slice(1), invert ? "Infinity" : "-Infinity", undefined];
+    case decimalZero:
+      return [buf.slice(1), "0", undefined];
+    default:
+      // For complex decimal cases, provide a basic approximation
+      // TODO: Implement full decimal decoding for complete accuracy
+      return [buf.slice(1), `<decimal:${buf[0].toString(16)}>`, undefined];
+  }
+}
+
+// Duration decoding functions - basic implementation
+function decodeDurationAscending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  if (peekType(buf) !== Type.Duration) {
+    return [new Uint8Array(), "", new Error(`did not find marker ${buf[0].toString(16)}`)];
+  }
+
+  let b = buf.slice(1);
+
+  // Decode sortNanos
+  let [b1, sortNanos, err1] = decodeVarintAscending(b);
+  if (err1) return [b1, "", err1];
+
+  // Decode months
+  let [b2, months, err2] = decodeVarintAscending(b1);
+  if (err2) return [b2, "", err2];
+
+  // Decode days
+  let [b3, days, err3] = decodeVarintAscending(b2);
+  if (err3) return [b3, "", err3];
+
+  // Basic duration formatting - convert nanos to a readable format
+  // This is a simplified version of Go's duration.Decode and StringNanos
+  const totalNanos = sortNanos;
+  const totalSeconds = Math.floor(totalNanos / 1000000000);
+  const remainingNanos = totalNanos % 1000000000;
+
+  let result = "";
+  if (months !== 0) result += `${months}mon `;
+  if (days !== 0) result += `${days}d `;
+  if (totalSeconds !== 0) result += `${totalSeconds}s `;
+  if (remainingNanos !== 0) result += `${remainingNanos}ns`;
+
+  if (result === "") result = "0s";
+
+  return [b3, result.trim(), undefined];
+}
+
+function decodeDurationDescending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  if (peekType(buf) !== Type.Duration) {
+    return [new Uint8Array(), "", new Error("did not find marker")];
+  }
+
+  let b = buf.slice(1);
+
+  // Decode sortNanos (descending)
+  let [b1, sortNanos, err1] = decodeVarintDescending(b);
+  if (err1) return [b1, "", err1];
+
+  // Decode months (descending)
+  let [b2, months, err2] = decodeVarintDescending(b1);
+  if (err2) return [b2, "", err2];
+
+  // Decode days (descending)
+  let [b3, days, err3] = decodeVarintDescending(b2);
+  if (err3) return [b3, "", err3];
+
+  // Basic duration formatting (same as ascending after decoding)
+  const totalNanos = sortNanos;
+  const totalSeconds = Math.floor(totalNanos / 1000000000);
+  const remainingNanos = totalNanos % 1000000000;
+
+  let result = "";
+  if (months !== 0) result += `${months}mon `;
+  if (days !== 0) result += `${days}d `;
+  if (totalSeconds !== 0) result += `${totalSeconds}s `;
+  if (remainingNanos !== 0) result += `${remainingNanos}ns`;
+
+  if (result === "") result = "0s";
+
+  return [b3, result.trim(), undefined];
+}
+
+// Helper function to decode uint64 - needed for float decoding
+function decodeUint64Ascending(b: Uint8Array): [Uint8Array, number, Error?] {
+  if (b.length < 8) {
+    return [new Uint8Array(), 0, new Error("insufficient bytes to decode uint64 int value")];
+  }
+
+  let v = 0;
+  for (let i = 0; i < 8; i++) {
+    v = (v * 256) + b[i];
+  }
+
+  return [b.slice(8), v, undefined];
+}
+
+// DecodeUvarintDescending - exact implementation from Go
+function decodeUvarintDescending(b: Uint8Array): [Uint8Array, number, Error?] {
+  const [leftover, v, err] = decodeUvarintAscending(b);
+  return [leftover, ~v, err];
+}
+
+// BitArray decoding functions - basic implementation
+function decodeBitArrayAscending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  if (peekType(buf) !== Type.BitArray) {
+    return [new Uint8Array(), "", new Error(`did not find marker ${buf[0].toString(16)}`)];
+  }
+
+  // For now, provide a basic implementation that at least consumes the correct bytes
+  // TODO: Implement full bitarray decoding for complete accuracy
+  let b = buf.slice(1);
+
+  // Try to consume varints until we hit a terminator or run out of data
+  try {
+    while (b.length > 0) {
+      const [remaining, _, err] = decodeUvarintAscending(b);
+      if (err) break;
+      b = remaining;
+
+      // Check for terminator (need to find the actual terminator value)
+      if (b.length > 0 && b[0] === 0x00) {
+        b = b.slice(1);
+        break;
+      }
+    }
+  } catch {
+    // If decoding fails, just consume one byte to avoid infinite loops
+    b = buf.slice(1);
+  }
+
+  return [b, "B<bitarray>", undefined];
+}
+
+function decodeBitArrayDescending(buf: Uint8Array): [Uint8Array, string, Error?] {
+  if (peekType(buf) !== Type.BitArrayDesc) {
+    return [new Uint8Array(), "", new Error(`did not find marker`)];
+  }
+
+  // Similar to ascending but with descending decoding
+  let b = buf.slice(1);
+
+  try {
+    while (b.length > 0) {
+      const [remaining, _, err] = decodeUvarintDescending ? decodeUvarintDescending(b) : decodeUvarintAscending(b);
+      if (err) break;
+      b = remaining;
+
+      // Check for terminator
+      if (b.length > 0 && b[0] === 0xFF) {
+        b = b.slice(1);
+        break;
+      }
+    }
+  } catch {
+    b = buf.slice(1);
+  }
+
+  return [b, "B<bitarray_desc>", undefined];
+}
+
+// Helper functions for array key processing - exact implementations from Go
+function validateAndConsumeArrayKeyMarker(buf: Uint8Array, dir: Direction): [Uint8Array, Error?] {
+  const typ = peekType(buf);
+  const expected = (dir === Direction.Descending) ? Type.ArrayKeyDesc : Type.ArrayKeyAsc;
+  if (typ !== expected) {
+    return [new Uint8Array(), new Error(`invalid type found ${typ}`)];
+  }
+  return [buf.slice(1), undefined];
+}
+
+function isArrayKeyDone(buf: Uint8Array, dir: Direction): boolean {
+  const expected = (dir === Direction.Descending) ? arrayKeyDescendingTerminator : arrayKeyTerminator;
+  return buf[0] === expected;
+}
+
+function isNextByteArrayEncodedNull(buf: Uint8Array, dir: Direction): boolean {
+  const expected = (dir === Direction.Descending) ? descendingNullWithinArrayKey : ascendingNullWithinArrayKey;
+  return buf[0] === expected;
+}
+
 // prettyPrintFirstValue implementation matching Go version
 function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, string, Error?] {
   if (b.length === 0) return [b, "", new Error("empty buffer")];
@@ -344,6 +596,51 @@ function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, stri
     case Type.Array:
       return [b.slice(1), "Arr", undefined];
 
+    case Type.ArrayKeyAsc:
+    case Type.ArrayKeyDesc:
+      const encDir = (typ === Type.ArrayKeyDesc) ? Direction.Descending : Direction.Ascending;
+      const [buf, arrayErr] = validateAndConsumeArrayKeyMarker(b, encDir);
+      if (arrayErr) {
+        return [new Uint8Array(), "", arrayErr];
+      }
+
+      let result = "ARRAY[";
+      let first = true;
+      let currentBuf = buf;
+
+      // Use the array key decoding logic, but instead of calling out
+      // to keyside.Decode, just make a recursive call.
+      while (true) {
+        if (currentBuf.length === 0) {
+          return [new Uint8Array(), "", new Error("invalid array (unterminated)")];
+        }
+        if (isArrayKeyDone(currentBuf, encDir)) {
+          currentBuf = currentBuf.slice(1);
+          break;
+        }
+
+        let next: string;
+        if (isNextByteArrayEncodedNull(currentBuf, dir)) {
+          next = "NULL";
+          currentBuf = currentBuf.slice(1);
+        } else {
+          const [nextBuf, nextStr, nextErr] = prettyPrintFirstValue(dir, currentBuf);
+          if (nextErr) {
+            return [new Uint8Array(), "", nextErr];
+          }
+          next = nextStr;
+          currentBuf = nextBuf;
+        }
+
+        if (!first) {
+          result += ",";
+        }
+        result += next;
+        first = false;
+      }
+      result += "]";
+      return [currentBuf, result, undefined];
+
     case Type.NotNull:
       return [b.slice(1), "!NULL", undefined];
 
@@ -355,12 +652,19 @@ function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, stri
       return [remaining, intVal.toString(), undefined];
 
     case Type.Float:
-      // Simplified float handling - just show as hex for now
-      return [b.slice(1), `<float:${b[0].toString(16)}>`, undefined];
+      let [floatRemaining, f, floatErr] = (dir === Direction.Descending)
+        ? decodeFloatDescending(b)
+        : decodeFloatAscending(b);
+      if (floatErr) return [b, "", floatErr];
+      // Format float using 'g' format like Go's strconv.FormatFloat(f, 'g', -1, 64)
+      return [floatRemaining, f.toString(), undefined];
 
     case Type.Decimal:
-      // Simplified decimal handling - just show as hex for now
-      return [b.slice(1), `<decimal:${b[0].toString(16)}>`, undefined];
+      let [decimalRemaining, decimalStr, decimalErr] = (dir === Direction.Descending)
+        ? decodeDecimalDescending(b)
+        : decodeDecimalAscending(b);
+      if (decimalErr) return [b, "", decimalErr];
+      return [decimalRemaining, decimalStr, undefined];
 
     case Type.Bytes:
       if (dir === Direction.Descending) {
@@ -399,13 +703,50 @@ function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, stri
       const date = new Date(finalSec * 1000 + finalNsec / 1000000);
       return [remaining2, date.toISOString(), undefined];
 
+    case Type.TimeTZ:
+      // TODO: Implement DecodeTimeTZAscending/DecodeTimeTZDescending - currently stubbed
+      if (dir === Direction.Descending) {
+        return [b.slice(1), `<timetz_desc:${b[0].toString(16)}>`, undefined];
+      } else {
+        return [b.slice(1), `<timetz:${b[0].toString(16)}>`, undefined];
+      }
+
     case Type.Duration:
-      // Simplified duration handling
-      return [b.slice(1), `<duration:${b[0].toString(16)}>`, undefined];
+      let [durationRemaining, durationStr, durationErr] = (dir === Direction.Descending)
+        ? decodeDurationDescending(b)
+        : decodeDurationAscending(b);
+      if (durationErr) return [b, "", durationErr];
+      return [durationRemaining, durationStr, undefined];
 
     case Type.BitArray:
-      // Simplified bit array handling
-      return [b.slice(1), `<bitarray:${b[0].toString(16)}>`, undefined];
+      if (dir === Direction.Descending) {
+        return [b, "", new Error("descending bit column dir but ascending bit array encoding")];
+      }
+      let [bitArrayRemaining, bitArrayStr, bitArrayErr] = decodeBitArrayAscending(b);
+      if (bitArrayErr) return [b, "", bitArrayErr];
+      return [bitArrayRemaining, bitArrayStr, undefined];
+
+    case Type.BitArrayDesc:
+      if (dir === Direction.Ascending) {
+        return [b, "", new Error("ascending bit column dir but descending bit array encoding")];
+      }
+      let [bitArrayDescRemaining, bitArrayDescStr, bitArrayDescErr] = decodeBitArrayDescending(b);
+      if (bitArrayDescErr) return [b, "", bitArrayDescErr];
+      return [bitArrayDescRemaining, bitArrayDescStr, undefined];
+
+    case Type.LTree:
+      if (dir === Direction.Descending) {
+        return [b, "", new Error("ascending ltree column dir but descending ltree encoding")];
+      }
+      // TODO: Implement DecodeLTreeAscending - currently stubbed
+      return [b.slice(1), `<ltree:${b[0].toString(16)}>`, undefined];
+
+    case Type.LTreeDesc:
+      if (dir === Direction.Ascending) {
+        return [b, "", new Error("descending ltree column dir but ascending ltree encoding")];
+      }
+      // TODO: Implement DecodeLTreeDescending - currently stubbed
+      return [b.slice(1), `<ltree_desc:${b[0].toString(16)}>`, undefined];
 
     default:
       if (b.length >= 1) {

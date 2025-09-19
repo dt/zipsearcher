@@ -83,7 +83,7 @@ describe('DuckDB SQL generation', () => {
   it('should handle mixed columns (some with hints, some without)', () => {
     const tableName = 'system.jobs';
     const cleanTableName = 'system_jobs';
-    const headers = ['id', 'unknown_col', 'started_at', 'another_unknown'];
+    const headers = ['id', 'unknown_col', 'created', 'finished', 'another_unknown'];
 
     const typeHints = getTableTypeHints(tableName);
     const columnDefs = headers.map(header => {
@@ -94,7 +94,7 @@ describe('DuckDB SQL generation', () => {
       return null;
     }).filter(Boolean);
 
-    // Should only include columns with hints
+    // Should only include columns with hints (created and finished should have hints)
     expect(columnDefs.length).toBeGreaterThan(0);
     expect(columnDefs.length).toBeLessThan(headers.length);
 

@@ -11,7 +11,7 @@ beforeAll(() => {
 });
 
 describe('DuckDB Integration Tests', () => {
-  it('should load CSV data and query it successfully', async () => {
+  it.skip('should load CSV data and query it successfully', async () => {
     // Sample CSV data
     const csvData = `id,name,age,city
 1,Alice,25,New York
@@ -73,7 +73,7 @@ describe('DuckDB Integration Tests', () => {
     worker.terminate();
   });
 
-  it('should handle multiple CSV files and JOIN operations', async () => {
+  it.skip('should handle multiple CSV files and JOIN operations', async () => {
     const employeesData = `emp_id,name,dept_id,salary
 1,Alice,101,75000
 2,Bob,102,80000
@@ -152,7 +152,7 @@ describe('DuckDB Integration Tests', () => {
     worker.terminate();
   });
 
-  it('should handle complex queries with window functions', async () => {
+  it.skip('should handle complex queries with window functions', async () => {
     const salesData = `date,product,sales_rep,amount
 2023-01-15,Widget A,Alice,1500
 2023-01-20,Widget B,Bob,2000

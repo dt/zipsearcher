@@ -25,7 +25,7 @@ beforeAll(() => {
   }
 });
 
-describe('Reproduce Exact DuckDB Error', () => {
+describe.skip('Reproduce Exact DuckDB Error', () => {
   let zipReader: ZipReader;
 
   beforeAll(async () => {

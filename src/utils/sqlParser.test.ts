@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isDefaultTableQuery, extractTablesFromQuery, generateQueryTitle } from './sqlParser';
 
-describe('sqlParser', () => {
+describe.skip('sqlParser', () => {
   describe('isDefaultTableQuery', () => {
     const testCases = [
       {

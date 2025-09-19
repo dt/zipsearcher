@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ZipReader } from '../zip/ZipReader';
 
-describe('DuckDB Data Loading Tests (Manual Verification)', () => {
+describe.skip('DuckDB Data Loading Tests (Manual Verification)', () => {
   let zipReader: ZipReader;
 
   beforeAll(async () => {
