@@ -236,7 +236,7 @@ export async function setupLogLanguage(monaco: Monaco) {
         [/[\w\/\.\-_]+\.go/, 'log.file'],
         [/:\d+/, 'log.line'],
         [/⋮/, 'log.separator'],
-        [/\[[^\]]+\]/, 'log.tags'],
+        [/\[[^\]]+\](?=\s+\d+\s)/, 'log.tags'], // Only match [...] followed by counter and space
         [/\s+\d+(?=\s+\w)/, 'log.counter'],
         [/\s+/, 'white'],
         [/./, 'log.message'],
