@@ -29,6 +29,20 @@ export class ProtoDecoder {
     if (this.loaded) return;
 
     try {
+      // In test environment, use filesystem to read the file
+      if (typeof window === 'undefined' || process.env.NODE_ENV === 'test' || typeof process !== 'undefined' && process.versions?.node) {
+        // Node.js environment - read file directly
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const filePath = path.resolve(process.cwd(), 'public/crdb.json');
+        const fileContent = await fs.readFile(filePath, 'utf-8');
+        const rootJson = JSON.parse(fileContent);
+        this.root = protobuf.Root.fromJSON(rootJson);
+        this.loaded = true;
+        return;
+      }
+
+      // Browser environment - use fetch
       const response = await fetch('./crdb.json');
       if (!response.ok) {
         throw new Error('CRDB JSON descriptor file not found');

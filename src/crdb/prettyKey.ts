@@ -1251,6 +1251,6 @@ export function isProbablyHexKey(value: string): boolean {
 
   if (!/^[0-9a-fA-F]+$/.test(cleaned)) return false;
 
-  // Only accept strings with known CRDB key prefixes
-  return cleaned.startsWith('12') || cleaned.startsWith('f2') || cleaned.startsWith('04');
+  // Accept any valid hex string that meets basic criteria
+  return true;
 }
