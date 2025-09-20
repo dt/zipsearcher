@@ -86,6 +86,44 @@ export const PROTO_COLUMN_MAPPINGS: ProtoColumnMapping[] = [
     description: 'Table/database/schema descriptor'
   },
 
+  // system.jobs
+  {
+    table: 'system.jobs',
+    column: 'payload',
+    protoType: 'cockroach.sql.jobs.jobspb.Payload',
+    description: 'Job payload'
+  },
+  {
+    table: 'system.jobs',
+    column: 'progress',
+    protoType: 'cockroach.sql.jobs.jobspb.Progress',
+    description: 'Job progress'
+  },
+  {
+    table: 'system_jobs',
+    column: 'payload',
+    protoType: 'cockroach.sql.jobs.jobspb.Payload',
+    description: 'Job payload'
+  },
+  {
+    table: 'system_jobs',
+    column: 'progress',
+    protoType: 'cockroach.sql.jobs.jobspb.Progress',
+    description: 'Job progress'
+  },
+  {
+    table: 'jobs',
+    column: 'payload',
+    protoType: 'cockroach.sql.jobs.jobspb.Payload',
+    description: 'Job payload'
+  },
+  {
+    table: 'jobs',
+    column: 'progress',
+    protoType: 'cockroach.sql.jobs.jobspb.Progress',
+    description: 'Job progress'
+  },
+
   // system.job_info - dynamic based on info_key column
   {
     table: 'system.job_info',
@@ -151,8 +189,15 @@ export const PROTO_COLUMN_MAPPINGS: ProtoColumnMapping[] = [
 
 // Find the proto type for a given table/column combination
 export function findProtoType(tableName: string, columnName: string): ProtoColumnMapping | null {
-  // Normalize names (remove schema prefix if present)
-  const normalizedTable = tableName.toLowerCase().replace(/^.*\./, '');
+  // Normalize names (remove file extensions and schema prefixes)
+  let normalizedTable = tableName.toLowerCase();
+
+  // Remove file extensions like .txt
+  normalizedTable = normalizedTable.replace(/\.(txt|csv|tsv)$/, '');
+
+  // Remove path prefixes like 'debug/'
+  normalizedTable = normalizedTable.replace(/^.*\//, '');
+
   const normalizedColumn = columnName.toLowerCase();
 
   return PROTO_COLUMN_MAPPINGS.find(

@@ -40,12 +40,12 @@ async function updateSchemaCache() {
     lastUpdated: Date.now()
   };
 
-  console.log('Schema cache updated:', {
-    tables: tables.length,
-    columns: columns.size,
-    functions: functions.length,
-    keywords: keywords.length
-  });
+  // // console.log('Schema cache updated:', {
+  //   tables: tables.length,
+  //   columns: columns.size,
+  //   functions: functions.length,
+  //   keywords: keywords.length
+  // });
 
   return schemaCache;
 }
@@ -221,25 +221,47 @@ export async function setupLogLanguage(monaco: Monaco) {
 
     tokenizer: {
       root: [
-        // Simplified approach - use individual patterns without massive capture groups
-        [/^[IWEF]/, { cases: {
-          'I': 'log.level.I',
-          'W': 'log.level.W',
-          'E': 'log.level.E',
-          'F': 'log.level.F',
-          '@default': 'log.level'
-        }}],
-        [/\d{6}\s+\d{2}:\d{2}:\d{2}/, 'log.datetime'],
-        [/\.\d{6}/, 'log.fractional'],
-        [/\s+\d+(?=\s)/, 'log.pid'],
-        [/\d+@/, 'log.goroutine'],
-        [/[\w\/\.\-_]+\.go/, 'log.file'],
-        [/:\d+/, 'log.line'],
-        [/⋮/, 'log.separator'],
-        [/\[[^\]]+\](?=\s+\d+\s)/, 'log.tags'], // Only match [...] followed by counter and space
-        [/\s+\d+(?=\s+\w)/, 'log.counter'],
-        [/\s+/, 'white'],
-        [/./, 'log.message'],
+        // Match the entire structured prefix first, then switch to message mode
+        // Lines with counter
+        [/^([IWEF])([0-9: ]{15})(\.\d+)( \d+ )(\d+@)([^:]+)(:\d+)( ⋮ )(\[[^\]]*\] )(\d+ )(.*)$/, [
+          { cases: {
+            'I': 'log.level.I',
+            'W': 'log.level.W',
+            'E': 'log.level.E',
+            'F': 'log.level.F',
+            '@default': 'log.level'
+          }},
+          'log.datetime',
+          'log.fractional',
+          'log.pid',
+          'log.channel',
+          'log.file',
+          'log.line',
+          'log.separator',
+          'log.tags',
+          'log.counter',
+          'log.message'
+        ]],
+        // Lines without counter
+        [/^([IWEF])([0-9: ]{15})(\.\d+)( \d+ )([^@:]+)(:\d+)( ⋮ )(\[[^\]]*\] )(.*)$/, [
+          { cases: {
+            'I': 'log.level.I',
+            'W': 'log.level.W',
+            'E': 'log.level.E',
+            'F': 'log.level.F',
+            '@default': 'log.level'
+          }},
+          'log.datetime',
+          'log.fractional',
+          'log.pid',
+          'log.file',
+          'log.line',
+          'log.separator',
+          'log.tags',
+          'log.message'
+        ]],
+        // Fallback for malformed lines - everything is message
+        [/.*/, 'log.message']
       ]
     }
   });
@@ -420,8 +442,8 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
   monaco.languages.registerCompletionItemProvider('duckdb-sql', {
     triggerCharacters: ['.', ' ', '(', ','],
 
-    async provideCompletionItems(model, position, context, token) {
-      console.log('provideCompletionItems called at position:', position);
+    async provideCompletionItems(model, position, _context, _token) {
+      // // console.log('provideCompletionItems called at position:', position);
 
       // Ensure schema cache is fresh
       if (!schemaCache || Date.now() - schemaCache.lastUpdated > 5000) {
@@ -429,7 +451,7 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
       }
 
       if (!schemaCache) {
-        console.log('No schema cache available');
+        // // console.log('No schema cache available');
         return { suggestions: [] };
       }
 
@@ -437,9 +459,9 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
       const offset = model.getOffsetAt(position);
       const ctx = extractContext(fullText, offset);
 
-      console.log('Full query:', fullText);
-      console.log('Context extracted - tables found:', Array.from(ctx.tables));
-      console.log('Context extracted - aliases:', Object.fromEntries(ctx.aliases));
+      // // console.log('Full query:', fullText);
+      // // console.log('Context extracted - tables found:', Array.from(ctx.tables));
+      // // console.log('Context extracted - aliases:', Object.fromEntries(ctx.aliases));
 
       const textUntilPosition = model.getValueInRange({
         startLineNumber: 1,
@@ -479,12 +501,12 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
       const isAfterDot = /([a-zA-Z_][\w_]*)\.[a-zA-Z0-9_]*$/i.test(lastChars);
       const isAfterParen = /\(\s*[a-zA-Z0-9_]*$/i.test(lastChars);
 
-      console.log('Context checks:', {
-        isAfterSelect,
-        isAfterComma,
-        isAfterWhere,
-        lastChars: lastChars.slice(-20)
-      });
+      // console.log('Context checks:', {
+      //   isAfterSelect,
+      //   isAfterComma,
+      //   isAfterWhere,
+      //   lastChars: lastChars.slice(-20)
+      // });
 
       // ===== A) table.column (after dot) =====
       if (isAfterDot) {
@@ -529,10 +551,10 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
         // Only show columns if we have tables in scope
         const activeTables = Array.from(ctx.tables);
 
-        console.log('In SELECT/WHERE section. Active tables:', activeTables.length);
+        // console.log('In SELECT/WHERE section. Active tables:', activeTables.length);
 
         // Always add functions first, regardless of tables
-        console.log('Adding functions. Current word:', word.word, 'Functions available:', schemaCache.functions.length);
+        // console.log('Adding functions. Current word:', word.word, 'Functions available:', schemaCache.functions.length);
 
         let functionsAdded = 0;
         for (const func of schemaCache.functions) {
@@ -547,11 +569,11 @@ export async function setupDuckDBLanguage(monaco: Monaco) {
           });
           functionsAdded++;
         }
-        console.log(`Added ${functionsAdded} functions`);
+        // console.log(`Added ${functionsAdded} functions`);
 
         // If no tables in scope yet, return with just functions
         if (activeTables.length === 0) {
-          console.log('No tables in scope, returning with functions only');
+          // console.log('No tables in scope, returning with functions only');
           return { suggestions };
         }
 

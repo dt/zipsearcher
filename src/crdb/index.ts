@@ -3,15 +3,6 @@ export { ProtoDecoder, protoDecoder, type DecodedProto, type ProtoDescriptor } f
 
 export function detectAndTransform(value: any): any {
   if (typeof value === 'string') {
-    if (isProbablyHexKey(value)) {
-      const decoded = prettyKey(value);
-      return {
-        original: value,
-        pretty: decoded.pretty,
-        type: 'hex_key'
-      };
-    }
-
     if (value.startsWith('{') && value.endsWith('}')) {
       try {
         return JSON.parse(value);
@@ -30,14 +21,6 @@ export function formatValue(value: any): string {
   }
 
   if (typeof value === 'object') {
-    if (value.type === 'hex_key') {
-      return value.pretty || value.original;
-    }
-
-    if (value._type === 'key') {
-      return value.pretty || value.hex;
-    }
-
     // Handle Date objects
     if (value instanceof Date) {
       // Format as ISO 8601

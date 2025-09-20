@@ -1,5 +1,5 @@
 import * as protobuf from 'protobufjs';
-import { prettyKey, isProbablyHexKey } from './prettyKey';
+import { prettyKey } from './prettyKey';
 
 export interface ProtoDescriptor {
   name: string;
@@ -28,34 +28,18 @@ export class ProtoDecoder {
   async loadCRDBDescriptors(): Promise<void> {
     if (this.loaded) return;
 
-    // Skip loading in test environment
-    if (typeof window === 'undefined' || typeof process !== 'undefined') {
-      console.log('Skipping proto descriptor loading in test environment');
-      return;
-    }
-
     try {
-      // Load the REAL CRDB descriptor set - NO FALLBACK
-      const response = await fetch('./crdb_jobs_complete.pb');
+      const response = await fetch('./crdb.json');
       if (!response.ok) {
-        throw new Error('CRDB descriptor file not found - cannot decode protos without it');
+        throw new Error('CRDB JSON descriptor file not found');
       }
 
-      const buffer = await response.arrayBuffer();
-
-      // Use the descriptor extension to properly load the FileDescriptorSet
-      const descriptor = await import('protobufjs/ext/descriptor');
-      const FileDescriptorSet = descriptor.FileDescriptorSet;
-      const fileDescriptorSet = FileDescriptorSet.decode(new Uint8Array(buffer));
-
-      // Create root from the descriptor set
-      this.root = protobuf.Root.fromDescriptor(fileDescriptorSet);
+      const rootJson = await response.json();
+      this.root = protobuf.Root.fromJSON(rootJson);
       this.loaded = true;
-
-      // console.log('Successfully loaded CRDB proto descriptors');
     } catch (error) {
       console.error('Failed to load CRDB descriptors:', error);
-      throw error; // NO FALLBACK - fail if we can't load real descriptors
+      throw error;
     }
   }
 
@@ -80,6 +64,7 @@ export class ProtoDecoder {
     }
   }
 
+
   decode(data: Uint8Array, typeName?: string): DecodedProto {
     if (!typeName) {
       return {
@@ -99,13 +84,14 @@ export class ProtoDecoder {
 
     try {
       const type = this.root.lookupType(typeName);
+
       const message = type.decode(data);
 
       // Use toObject with proper options for CRDB compatibility
       const decoded = type.toObject(message, {
         longs: String,
         bytes: String,
-        defaults: true,
+        defaults: false,
         arrays: true,
         objects: true,
         oneofs: true
@@ -120,6 +106,7 @@ export class ProtoDecoder {
         typeName
       };
     } catch (error) {
+
       return {
         raw: data,
         decoded: null,
@@ -129,14 +116,6 @@ export class ProtoDecoder {
   }
 
 
-  private tryDecodeString(bytes: Uint8Array): string | null {
-    try {
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      return decoder.decode(bytes);
-    } catch {
-      return null;
-    }
-  }
 
 
   private transformMessage(obj: any): any {
@@ -175,6 +154,30 @@ export class ProtoDecoder {
   private transformValue(key: string, value: any): any {
     // Handle base64 encoded bytes fields
     if (typeof value === 'string') {
+      // Handle key fields - try to replace with pretty key representation
+      if (key.toLowerCase().includes('key')) {
+        // Handle hex keys (start with \x)
+        if (value === '\\x' || value.startsWith('\\x')) {
+          try {
+            const decoded = prettyKey(value);
+            return decoded.pretty;
+          } catch {
+            // If prettyKey fails, return original value
+          }
+        }
+        // Handle base64-encoded keys
+        else if (/^[A-Za-z0-9+/]*(=|==)?$/.test(value) && value.length % 4 === 0) {
+          try {
+            const bytes = Buffer.from(value, 'base64');
+            const hexStr = bytes.toString('hex');
+            const decoded = prettyKey(hexStr);
+            if (decoded.pretty !== hexStr) {
+              return decoded.pretty;
+            }
+          } catch {}
+        }
+      }
+
       // Convert base64 cluster ID to UUID format
       if (key.includes('cluster_id')) {
         try {
@@ -193,36 +196,6 @@ export class ProtoDecoder {
         } catch {}
       }
 
-      // Handle CRDB keys - any field with 'key' in the name or that looks like a key
-      // This includes startKey, endKey, key, spans[].key, etc.
-      if (key.toLowerCase().includes('key') || isProbablyHexKey(value)) {
-        try {
-          // First try to decode as base64 (common for proto bytes fields)
-          const bytes = Buffer.from(value, 'base64');
-          const hexStr = bytes.toString('hex');
-
-          if (isProbablyHexKey(hexStr)) {
-            const decoded = prettyKey(hexStr);
-            return {
-              _type: 'key',
-              hex: hexStr,
-              pretty: decoded.pretty
-            };
-          }
-        } catch {}
-
-        // Try as direct hex string
-        if (isProbablyHexKey(value)) {
-          const decoded = prettyKey(value);
-          if (decoded.pretty !== value) {
-            return {
-              _type: 'key',
-              hex: value,
-              pretty: decoded.pretty
-            };
-          }
-        }
-      }
     }
 
     // Handle roachpb.Span objects with startKey and endKey
@@ -276,6 +249,9 @@ export class ProtoDecoder {
     collectTypes(this.root.toJSON());
     return types.sort();
   }
+
+
+
 }
 
 export const protoDecoder = new ProtoDecoder();

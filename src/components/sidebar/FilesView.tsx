@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useApp } from '../../state/AppContext';
 import FileTree from '../FileTree';
-import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
 
 function FilesView() {
   const { state } = useApp();
-  const navigation = useKeyboardNavigation();
   const [filter, setFilter] = useState('');
 
   if (!state.zip) {

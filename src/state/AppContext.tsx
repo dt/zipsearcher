@@ -11,7 +11,8 @@ type AppAction =
   | { type: 'UPDATE_TAB'; id: string; updates: Partial<ViewerTab> }
   | { type: 'CACHE_FILE'; id: string; content: { text?: string; bytes?: Uint8Array } }
   | { type: 'REGISTER_TABLE'; table: TableMeta }
-  | { type: 'UPDATE_TABLE'; name: string; updates: Partial<TableMeta> };
+  | { type: 'UPDATE_TABLE'; name: string; updates: Partial<TableMeta> }
+  | { type: 'SET_TABLES_LOADING'; loading: boolean };
 
 const initialState: AppState = {
   openTabs: [],
@@ -143,6 +144,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ...state.tables,
           [action.name]: { ...existing, ...action.updates },
         },
+      };
+    }
+
+    case 'SET_TABLES_LOADING': {
+      return {
+        ...state,
+        tablesLoading: action.loading,
       };
     }
 

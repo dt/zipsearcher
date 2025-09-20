@@ -142,64 +142,66 @@ const SYSTEM_TABLES: Record<number, string> = {
 };
 
 // Type enum values
-const enum Type {
-  Unknown = 0,
-  Null = 1,
-  NotNull = 2,
-  Int = 3,
-  Float = 4,
-  Decimal = 5,
-  Bytes = 6,
-  BytesDesc = 7,
-  Time = 8,
-  Duration = 9,
-  True = 10,
-  False = 11,
-  UUID = 12,
-  Array = 13,
-  IPAddr = 14,
-  JSON = 15,
-  Tuple = 16,
-  BitArray = 17,
-  BitArrayDesc = 18,
-  TimeTZ = 19,
-  Geo = 20,
-  GeoDesc = 21,
-  ArrayKeyAsc = 22,
-  ArrayKeyDesc = 23,
-  Box2D = 24,
-  Void = 25,
-  TSQuery = 26,
-  TSVector = 27,
-  JSONNull = 28,
-  JSONNullDesc = 29,
-  JSONString = 30,
-  JSONStringDesc = 31,
-  JSONNumber = 32,
-  JSONNumberDesc = 33,
-  JSONFalse = 34,
-  JSONFalseDesc = 35,
-  JSONTrue = 36,
-  JSONTrueDesc = 37,
-  JSONArray = 38,
-  JSONArrayDesc = 39,
-  JSONObject = 40,
-  JSONObjectDesc = 41,
-  JsonEmptyArray = 42,
-  JsonEmptyArrayDesc = 43,
-  PGVector = 44,
-  LTree = 45,
-  LTreeDesc = 46
-}
+const Type = {
+  Unknown: 0,
+  Null: 1,
+  NotNull: 2,
+  Int: 3,
+  Float: 4,
+  Decimal: 5,
+  Bytes: 6,
+  BytesDesc: 7,
+  Time: 8,
+  Duration: 9,
+  True: 10,
+  False: 11,
+  UUID: 12,
+  Array: 13,
+  IPAddr: 14,
+  JSON: 15,
+  Tuple: 16,
+  BitArray: 17,
+  BitArrayDesc: 18,
+  TimeTZ: 19,
+  Geo: 20,
+  GeoDesc: 21,
+  ArrayKeyAsc: 22,
+  ArrayKeyDesc: 23,
+  Box2D: 24,
+  Void: 25,
+  TSQuery: 26,
+  TSVector: 27,
+  JSONNull: 28,
+  JSONNullDesc: 29,
+  JSONString: 30,
+  JSONStringDesc: 31,
+  JSONNumber: 32,
+  JSONNumberDesc: 33,
+  JSONFalse: 34,
+  JSONFalseDesc: 35,
+  JSONTrue: 36,
+  JSONTrueDesc: 37,
+  JSONArray: 38,
+  JSONArrayDesc: 39,
+  JSONObject: 40,
+  JSONObjectDesc: 41,
+  JsonEmptyArray: 42,
+  JsonEmptyArrayDesc: 43,
+  PGVector: 44,
+  LTree: 45,
+  LTreeDesc: 46
+} as const;
+type TypeValue = typeof Type[keyof typeof Type];
 
 // Direction enum
-const enum Direction {
-  Ascending = 1,
-  Descending = 2
-}
+const Direction = {
+  Ascending: 1,
+  Descending: 2
+} as const;
+type DirectionValue = typeof Direction[keyof typeof Direction];
 
 // PeekType implementation matching the Go version
-function peekType(b: Uint8Array): Type {
+function peekType(b: Uint8Array): TypeValue {
   if (b.length === 0) return Type.Unknown;
 
   const m = b[0];
@@ -558,7 +560,7 @@ function decodeBitArrayDescending(buf: Uint8Array): [Uint8Array, string, Error?]
 }
 
 // Helper functions for array key processing - exact implementations from Go
-function validateAndConsumeArrayKeyMarker(buf: Uint8Array, dir: Direction): [Uint8Array, Error?] {
+function validateAndConsumeArrayKeyMarker(buf: Uint8Array, dir: DirectionValue): [Uint8Array, Error?] {
   const typ = peekType(buf);
   const expected = (dir === Direction.Descending) ? Type.ArrayKeyDesc : Type.ArrayKeyAsc;
   if (typ !== expected) {
@@ -567,18 +569,18 @@ function validateAndConsumeArrayKeyMarker(buf: Uint8Array, dir: Direction): [Uin
   return [buf.slice(1), undefined];
 }
 
-function isArrayKeyDone(buf: Uint8Array, dir: Direction): boolean {
+function isArrayKeyDone(buf: Uint8Array, dir: DirectionValue): boolean {
   const expected = (dir === Direction.Descending) ? arrayKeyDescendingTerminator : arrayKeyTerminator;
   return buf[0] === expected;
 }
 
-function isNextByteArrayEncodedNull(buf: Uint8Array, dir: Direction): boolean {
+function isNextByteArrayEncodedNull(buf: Uint8Array, dir: DirectionValue): boolean {
   const expected = (dir === Direction.Descending) ? descendingNullWithinArrayKey : ascendingNullWithinArrayKey;
   return buf[0] === expected;
 }
 
 // prettyPrintFirstValue implementation matching Go version
-function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, string, Error?] {
+function prettyPrintFirstValue(dir: DirectionValue, b: Uint8Array): [Uint8Array, string, Error?] {
   if (b.length === 0) return [b, "", new Error("empty buffer")];
 
   const typ = peekType(b);
@@ -791,7 +793,7 @@ function prettyPrintFirstValue(dir: Direction, b: Uint8Array): [Uint8Array, stri
 }
 
 // prettyPrintValueImpl implementation matching Go version
-function prettyPrintValueImpl(valDirs: Direction[], b: Uint8Array, _sep: string): [string[], boolean] {
+function prettyPrintValueImpl(valDirs: DirectionValue[], b: Uint8Array, _sep: string): [string[], boolean] {
   const result: string[] = [];
   let allDecoded = true;
   let currentDirs = [...valDirs];
@@ -822,7 +824,7 @@ function prettyPrintValueImpl(valDirs: Direction[], b: Uint8Array, _sep: string)
 }
 
 // Main PrettyPrintValue implementation matching Go version
-function prettyPrintValue(valDirs: Direction[], b: Uint8Array, sep: string): string {
+function prettyPrintValue(valDirs: DirectionValue[], b: Uint8Array, sep: string): string {
   const [parts, allDecoded] = prettyPrintValueImpl(valDirs, b, sep);
 
   if (allDecoded) {
@@ -1249,11 +1251,6 @@ export function isProbablyHexKey(value: string): boolean {
 
   if (!/^[0-9a-fA-F]+$/.test(cleaned)) return false;
 
-  // Check for CRDB key prefixes
-  if (cleaned.startsWith('12') || cleaned.startsWith('f2') || cleaned.startsWith('04')) {
-    return true;
-  }
-
-  const nonHexChars = cleaned.replace(/[0-9a-f]/gi, '').length;
-  return nonHexChars === 0 && cleaned.length >= 8;
+  // Only accept strings with known CRDB key prefixes
+  return cleaned.startsWith('12') || cleaned.startsWith('f2') || cleaned.startsWith('04');
 }

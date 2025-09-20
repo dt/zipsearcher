@@ -1,8 +1,7 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useApp } from '../../state/AppContext';
 import { duckDBService } from '../../services/duckdb';
 import { useKeyboardNavigation } from '../../hooks/useKeyboardNavigation';
-import type { NavigationItem } from '../../hooks/useKeyboardNavigation';
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -61,6 +60,16 @@ function TablesView() {
     // Count tables that are either loaded or failed
     const completedCount = autoLoadTables.filter(t => t.loaded || t.loadError).length;
     const totalCount = autoLoadTables.length;
+
+    // Debug: Log incomplete tables when we're close to completion
+    if (completedCount >= totalCount - 5) {
+      const incomplete = autoLoadTables.filter(t => !t.loaded && !t.loadError);
+      if (incomplete.length > 0) {
+        console.log(`Progress debug: ${completedCount}/${totalCount} complete. Incomplete tables:`,
+          incomplete.map(t => ({ name: t.name, loading: t.loading, loaded: t.loaded, loadError: t.loadError }))
+        );
+      }
+    }
 
     // Hide the progress bar when complete
     if (completedCount === totalCount) return null;
@@ -386,7 +395,7 @@ function TablesView() {
             <span className="section-chevron">{collapsedSections.has('custom-queries') ? '▶' : '▼'}</span>
             Custom Queries
           </div>
-          {!collapsedSections.has('custom-queries') && customQueryTabs.map((tab, index) => {
+          {!collapsedSections.has('custom-queries') && customQueryTabs.map((tab) => {
             const isHighlighted = navigation.state.isNavigating &&
               navigation.state.items[navigation.state.highlightedIndex]?.id === `query-${tab.id}`;
             return (
@@ -420,7 +429,7 @@ function TablesView() {
                   <div
                     key={table.name}
                     ref={(el) => registerElement(`table-${table.name}`, el)}
-                    className={`table-item-compact ${table.loading ? 'loading' : ''} ${table.deferred ? 'deferred' : ''} ${table.isError ? 'error-file' : ''} ${table.loadError ? 'load-failed' : ''} ${table.rowCount === 0 ? 'empty-table' : ''} ${isHighlighted ? 'keyboard-highlighted' : ''}`}
+                    className={`table-item-compact ${table.loading ? 'loading' : ''} ${table.deferred ? 'deferred' : ''} ${table.isError ? 'error-file' : ''} ${table.loadError ? 'load-failed' : ''} ${table.rowCount === 0 ? 'empty-table' : ''} ${!table.loaded && !table.loading && !table.deferred ? 'unloaded' : ''} ${isHighlighted ? 'keyboard-highlighted' : ''}`}
                     onClick={() => handleTableClick(table)}
                   >
                     {table.loaded && table.rowCount !== undefined && !table.isError && !table.loadError && !table.deferred && (
@@ -504,7 +513,7 @@ function TablesView() {
                         <div
                           key={table.name}
                           ref={(el) => registerElement(`table-${table.name}`, el)}
-                          className={`table-item-compact ${table.loading ? 'loading' : ''} ${table.deferred ? 'deferred' : ''} ${table.isError ? 'error-file' : ''} ${table.loadError ? 'load-failed' : ''} ${table.rowCount === 0 ? 'empty-table' : ''} ${isHighlighted ? 'keyboard-highlighted' : ''}`}
+                          className={`table-item-compact ${table.loading ? 'loading' : ''} ${table.deferred ? 'deferred' : ''} ${table.isError ? 'error-file' : ''} ${table.loadError ? 'load-failed' : ''} ${table.rowCount === 0 ? 'empty-table' : ''} ${!table.loaded && !table.loading && !table.deferred ? 'unloaded' : ''} ${isHighlighted ? 'keyboard-highlighted' : ''}`}
                           onClick={() => handleTableClick(table)}
                         >
                           {table.loaded && table.rowCount !== undefined && !table.isError && !table.loadError && !table.deferred && (

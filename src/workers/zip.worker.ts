@@ -22,7 +22,7 @@ async function streamFile(path: string, zipData: Uint8Array) {
     let accumulatedData = new Uint8Array(0);
     let fileSize = 0;
     let processedBytes = 0;
-    const decoder = new TextDecoder('utf-8', { stream: true });
+    const decoder = new TextDecoder('utf-8');
     let fullText = '';
 
     await new Promise<void>((resolve, reject) => {
@@ -71,7 +71,6 @@ async function streamFile(path: string, zipData: Uint8Array) {
               fullText += decodedChunk;
 
               // Send chunk to main thread
-              const percent = fileSize > 0 ? Math.round((processedBytes / fileSize) * 100) : 0;
               self.postMessage({
                 type: 'chunk',
                 data: decodedChunk,

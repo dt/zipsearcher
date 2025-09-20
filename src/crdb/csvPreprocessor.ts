@@ -1,6 +1,84 @@
 import { protoDecoder } from './protoDecoder';
-import { prettyKey, isProbablyHexKey } from './prettyKey';
-import { findProtoType, looksLikeProtobuf } from './protoRegistry';
+import { prettyKey } from './prettyKey';
+import { findProtoType } from './protoRegistry';
+
+// Utility function to try replacing a value with its pretty key representation
+function tryReplaceWithPrettyKey(value: string): string {
+  if (!value || typeof value !== 'string') {
+    return value;
+  }
+
+  // Handle hex keys (start with \x)
+  if (value === '\\x' || value.startsWith('\\x')) {
+    try {
+      const decoded = prettyKey(value);
+      return decoded.pretty;
+    } catch {
+      return value;
+    }
+  }
+
+  // Handle base64-encoded keys
+  if (/^[A-Za-z0-9+/]*(=|==)?$/.test(value) && value.length % 4 === 0) {
+    try {
+      // Browser-compatible base64 decoding
+      const binaryString = atob(value);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const hexStr = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+      // For base64-decoded keys, try to format even short values
+      if (hexStr.length >= 2 && hexStr.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(hexStr)) {
+        // Single byte values are likely table IDs
+        if (hexStr.length === 2) {
+          const tableId = parseInt(hexStr, 16);
+          return `/Table/${tableId}`;
+        }
+
+        // For longer values, try prettyKey
+        try {
+          const decoded = prettyKey(hexStr);
+          if (decoded.pretty !== hexStr) {
+            return decoded.pretty;
+          }
+        } catch (err) {
+          // Ignore prettyKey failures
+        }
+      }
+    } catch (err) {
+      // Ignore base64 decode failures
+    }
+  }
+
+  return value;
+}
+
+// Recursively process an object/array to replace key fields
+function processObjectForKeys(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => processObjectForKeys(item));
+  }
+
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.toLowerCase().includes('key') && typeof value === 'string') {
+        result[key] = tryReplaceWithPrettyKey(value);
+      } else {
+        result[key] = processObjectForKeys(value);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+}
 
 export interface PreprocessOptions {
   tableName: string;
@@ -38,38 +116,6 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-// This function is no longer used - we add separate columns instead
-function preprocessValue(
-  value: string,
-  columnName: string,
-  tableName: string,
-  options: PreprocessOptions
-): string {
-  // Skip null/empty values
-  if (!value || value === '\\N' || value === 'NULL') {
-    return value;
-  }
-
-  // Check if this column should have protobuf data decoded
-  if (options.decodeProtos && looksLikeProtobuf(value)) {
-    const mapping = findProtoType(tableName, columnName);
-    if (mapping) {
-      try {
-        const bytes = hexToBytes(value);
-        const decoded = protoDecoder.decode(bytes, mapping.protoType);
-
-        if (decoded.decoded && !decoded.error) {
-          // Return as JSON string
-          return JSON.stringify(decoded.decoded);
-        }
-      } catch (err) {
-        console.warn(`Failed to decode proto in ${tableName}.${columnName}:`, err);
-      }
-    }
-  }
-
-  return value;
-}
 
 // Main preprocessing function - transforms keys in place
 export function preprocessCSV(
@@ -88,8 +134,6 @@ export function preprocessCSV(
   const protoColumns = new Map<number, string | null>(); // Map column index to proto type (or null if no mapping)
   let infoKeyColumnIndex = -1; // For dynamic proto resolution in job_info table
 
-  // Log column identification once
-  const columnInfo: string[] = [];
 
   headers.forEach((header, index) => {
     const columnName = header.toLowerCase();
@@ -102,14 +146,12 @@ export function preprocessCSV(
           columnName.includes('start_key') ||
           columnName.includes('end_key')) {
         keyColumns.add(index);
-        columnInfo.push(`  ${header}: KEY column`);
       }
     }
 
     // Track info_key column for job_info tables
     if (columnName === 'info_key' && options.tableName.toLowerCase().includes('job_info')) {
       infoKeyColumnIndex = index;
-      columnInfo.push(`  ${header}: info_key (for dynamic proto)`);
     }
 
     // Check for proto columns
@@ -118,48 +160,30 @@ export function preprocessCSV(
           columnName === 'payload' || columnName === 'progress' || columnName === 'value') {
         const mapping = findProtoType(options.tableName, header);
         protoColumns.set(index, mapping?.protoType || null);
-        if (mapping) {
-          columnInfo.push(`  ${header}: PROTO column -> ${mapping.protoType}`);
-        } else {
-          columnInfo.push(`  ${header}: PROTO column (no mapping)`);
-        }
       }
     }
   });
 
 
-  // Debug: Check if we found the config column for span_configurations
-  if (options.tableName.toLowerCase().includes('span_config') && protoColumns.size === 0) {
-    console.log(`WARNING: No proto columns found for ${options.tableName}. Headers: ${headers.join(', ')}`);
-  }
 
-  // If no columns need processing, return original content
-  if (keyColumns.size === 0 && protoColumns.size === 0) {
+
+  // If no columns need processing and we're not doing JSON key processing, return original content
+  if (keyColumns.size === 0 && protoColumns.size === 0 && !options.decodeKeys) {
     return content;
   }
 
   // Process rows - transform values in place
-  let dynamicProtoLogged = false;
-  let decodeErrors = 0;
-  const maxErrorLogs = 3;
-  let successCount = 0;
 
-  const processedRows = rows.map((row, rowIndex) => {
+  const processedRows = rows.map((row) => {
     return row.map((value, colIndex) => {
+
       // Transform key columns
       if (keyColumns.has(colIndex)) {
         // Handle null/empty differently from \x (which is a valid empty key)
         if (value === '\\N' || value === 'NULL') {
           return value;
         }
-
-        // Even empty string or just \x should be processed
-        if (value !== undefined && value !== null) {
-          if (value === '\\x' || value.startsWith('\\x') || isProbablyHexKey(value)) {
-            const decoded = prettyKey(value);
-            return decoded.pretty;
-          }
-        }
+        return tryReplaceWithPrettyKey(value);
       }
 
       // Transform proto columns
@@ -176,14 +200,6 @@ export function preprocessCSV(
             protoType = null; // Unknown info_key type
           }
 
-          // Suppress dynamic proto logging
-          // if (!dynamicProtoLogged) {
-          //   console.log(`  Dynamic proto: info_key='${infoKey}' -> ${protoType || 'none'}`);
-          //   if (value && value.startsWith('\\x')) {
-          //     console.log(`  Value is hex data: ${value.substring(0, 50)}...`);
-          //   }
-          //   dynamicProtoLogged = true;
-          // }
         }
 
         if (value && value !== '\\N' && value !== 'NULL') {
@@ -193,50 +209,59 @@ export function preprocessCSV(
             return value;
           }
 
-          if (looksLikeProtobuf(value)) {
-            if (protoType && protoType !== 'dynamic:job_info') {
+          // If we have an explicit proto mapping, decode it
+          if (protoType && protoType !== 'dynamic:job_info') {
               try {
+
                 const bytes = hexToBytes(value);
 
-                // Suppress decode debugging
-                // if (options.tableName.toLowerCase().includes('job_info') && successCount === 0) {
-                //   const infoKey = infoKeyColumnIndex >= 0 ? row[infoKeyColumnIndex] : 'unknown';
-                //   console.log(`  About to decode ${infoKey} as ${protoType}`);
-                //   console.log(`  First bytes: ${Array.from(bytes.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
-                // }
 
-                let decoded = protoDecoder.decode(bytes, protoType);
+                const decoded = protoDecoder.decode(bytes, protoType);
 
                 // Don't use fallback for job_info - if the specific proto fails, leave as hex
                 // The fallback was incorrectly decoding Progress data as SpanConfig
 
                 if (decoded.decoded && !decoded.error) {
-                  successCount++;
-                  // Suppress first decode success logging
-                  // if (successCount === 1) {
-                  //   console.log(`  First successful decode: ${JSON.stringify(decoded.decoded).substring(0, 100)}...`);
-                  // }
                   // Return as compact JSON string
                   return JSON.stringify(decoded.decoded);
-                } else if (decoded.error && decodeErrors < maxErrorLogs) {
-                  // Only log decode errors in development
-                  // console.log(`  Decode error (row ${rowIndex + 1}): ${decoded.error.substring(0, 100)}`);
-                  decodeErrors++;
-                  // if (decodeErrors === maxErrorLogs) {
-                  //   console.log(`  (suppressing further decode errors)`);
-                  // }
                 }
-              } catch (err) {
-                if (decodeErrors < maxErrorLogs) {
-                  console.log(`  Exception (row ${rowIndex + 1}): ${String(err).substring(0, 100)}`);
-                  decodeErrors++;
-                }
+              } catch {
+                // Don't let protobuf errors stop processing of subsequent rows
               }
+          }
+        }
+      }
+
+      // Process JSON columns for key fields (handle both regular and escaped JSON)
+      if (value && typeof value === 'string') {
+        let jsonStr = value.trim();
+
+        // Check for quoted JSON with doubled quotes inside
+        if (jsonStr.startsWith('"{') && jsonStr.endsWith('}"') && jsonStr.includes('""')) {
+          try {
+            // Remove outer quotes
+            jsonStr = jsonStr.slice(1, -1);
+            // Convert doubled quotes to single quotes (\"\") -> (\")
+            jsonStr = jsonStr.replace(/\"\"/g, '"');
+          } catch (e) {
+            // Ignore JSON fix failures
+          }
+        }
+
+        // Now check if we have JSON (either direct or processed)
+        if (jsonStr.startsWith('{') && jsonStr.endsWith('}')) {
+          try {
+            const jsonObj = JSON.parse(jsonStr);
+            const processedObj = processObjectForKeys(jsonObj);
+            const result = JSON.stringify(processedObj);
+
+            // If it was originally quoted JSON with doubled quotes, restore the format
+            if (value.startsWith('"{') && value.endsWith('}"') && value.includes('""')) {
+              return '"' + result.replace(/"/g, '""') + '"';
             }
-          } else if (protoType && decodeErrors < maxErrorLogs && value.startsWith('\\x')) {
-            // We expected protobuf but the value doesn't look like it
-            console.log(`  Row ${rowIndex + 1}: Expected protobuf but got: ${value.substring(0, 30)}...`);
-            decodeErrors++;
+            return result;
+          } catch (e) {
+            // If JSON parsing fails, leave original value
           }
         }
       }
@@ -251,12 +276,6 @@ export function preprocessCSV(
     ...processedRows.map(row => row.join(delimiter))
   ];
 
-  // Suppress summary logging unless there are significant issues
-  // if (protoColumns.size > 0 && successCount === 0 && decodeErrors > 0) {
-  //   console.log(`  WARNING: No protobufs successfully decoded (${decodeErrors} errors)`);
-  // } else if (successCount > 0) {
-  //   console.log(`  Successfully decoded ${successCount} protobuf values`);
-  // }
 
   return processedLines.join('\n');
 }

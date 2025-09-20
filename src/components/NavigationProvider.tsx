@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { NavigationContext, useNavigationProvider } from '../hooks/useKeyboardNavigation';
 
 interface NavigationProviderProps {

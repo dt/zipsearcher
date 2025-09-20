@@ -60,7 +60,7 @@ export class ZipReader {
 
   async readFile(
     path: string,
-    onProgress?: (loaded: number, total: number) => void
+    _onProgress?: (loaded: number, total: number) => void
   ): Promise<{ text?: string; bytes?: Uint8Array }> {
     // Simple approach using unzip with filter
     const { unzip } = fflate;

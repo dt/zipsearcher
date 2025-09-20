@@ -7,7 +7,7 @@ import { duckDBService } from '../services/duckdb';
 import { useApp } from '../state/AppContext';
 import { isDefaultTableQuery, generateQueryTitle } from '../utils/sqlParser';
 import { setupDuckDBLanguage, refreshSchemaCache } from '../services/monacoConfig';
-import { isProbablyHexKey, prettyKey, formatValue } from '../crdb';
+import { formatValue } from '../crdb';
 
 interface SqlEditorProps {
   tab: ViewerTab & { kind: 'sql' };

@@ -4,13 +4,16 @@ import { ZipReader } from '../zip/ZipReader';
 import { duckDBService } from '../services/duckdb';
 
 function DropZone() {
-  const { dispatch } = useApp();
+  const { dispatch, state } = useApp();
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const loadSystemTables = async (reader: any, entries: any[]) => {
+  // Check if we should show loading state (either local loading or tables loading)
+  const isLoading = loading || state.tablesLoading;
+
+  const loadSystemTables = async (reader: any, entries: any[]): Promise<void> => {
     // Load system and crdb_internal tables in the background
     // First load root tables, then node-specific tables
     const rootTables = entries.filter(entry =>
@@ -48,6 +51,12 @@ function DropZone() {
       }
 
       try {
+        // Mark table as loading
+        dispatch({
+          type: 'UPDATE_TABLE',
+          name: tableName,
+          updates: { loading: true, nodeId, originalName },
+        });
 
         // Check file size - defer loading if too large
         if (entry.size > LARGE_FILE_THRESHOLD) {
@@ -59,6 +68,7 @@ function DropZone() {
             name: tableName,
             updates: {
               loaded: false,
+              loading: false,
               deferred: true,
               size: entry.size,
               nodeId,
@@ -68,23 +78,52 @@ function DropZone() {
           continue;
         }
 
-        // console.log(`Loading table ${tableName} from ${entry.path}...`);
+        // Debug specific problematic table
+        if (tableName.includes('probe_ranges')) {
+          console.log(`[DEBUG] Loading problematic table ${tableName} from ${entry.path}...`);
+        }
 
         // Read file content
         const result = await reader.readFile(entry.path);
         if (result.text) {
+          // Check if file has only headers (no data rows)
+          const lines = result.text.trim().split('\n');
+          if (lines.length <= 1) {
+            // Only header line or empty file
+            dispatch({
+              type: 'UPDATE_TABLE',
+              name: tableName,
+              updates: { loaded: true, loading: false, rowCount: 0, nodeId, originalName },
+            });
+          } else {
+
           // Load into DuckDB and get row count
           const rowCount = await duckDBService.loadTableFromText(tableName, result.text);
+
+          // Debug specific problematic table
+          if (tableName.includes('probe_ranges')) {
+            console.log(`[DEBUG] Successfully loaded ${tableName} with ${rowCount} rows`);
+          }
 
           // Update table status with row count
           dispatch({
             type: 'UPDATE_TABLE',
             name: tableName,
-            updates: { loaded: true, rowCount, nodeId, originalName },
+            updates: { loaded: true, loading: false, rowCount, nodeId, originalName },
           });
+          }
+        } else {
+          // No text content found
+          throw new Error('No text content found in file');
         }
       } catch (err) {
         console.error(`Failed to load table from ${entry.path}:`, err);
+
+        // Debug specific problematic table
+        if (tableName.includes('probe_ranges')) {
+          console.log(`[DEBUG] Error loading ${tableName}:`, err);
+        }
+
         // Mark table as failed with error message
         const errorMessage = err instanceof Error ? err.message : String(err);
         dispatch({
@@ -137,12 +176,25 @@ function DropZone() {
         entries,
       });
 
+      // Set tables loading state before starting DuckDB
+      dispatch({ type: 'SET_TABLES_LOADING', loading: true });
+      setLoadingMessage('Loading tables...');
+
       // Initialize DuckDB in the background
       duckDBService.initialize().then(() => {
         // console.log('DuckDB ready, loading system tables...');
-        loadSystemTables(reader, entries);
+        loadSystemTables(reader, entries).then(() => {
+          dispatch({ type: 'SET_TABLES_LOADING', loading: false });
+          setLoading(false);
+        }).catch(err => {
+          console.error('Failed to load system tables:', err);
+          dispatch({ type: 'SET_TABLES_LOADING', loading: false });
+          setLoading(false);
+        });
       }).catch(err => {
         console.error('Failed to initialize DuckDB:', err);
+        dispatch({ type: 'SET_TABLES_LOADING', loading: false });
+        setLoading(false);
       });
 
       // Auto-detect system tables (root and node-specific)
@@ -183,7 +235,6 @@ function DropZone() {
     } catch (err) {
       console.error('Failed to read zip:', err);
       setError(`Failed to read zip: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -264,11 +315,11 @@ function DropZone() {
       />
 
       <div className="drop-message">
-        {loading ? (
-          <>
-            <div className="loading-spinner" />
-            <p>{loadingMessage}</p>
-          </>
+        {isLoading ? (
+          <p style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="loading-spinner-small" />
+            {loadingMessage || 'Loading tables...'}
+          </p>
         ) : error ? (
           <>
             <h2 style={{ color: 'var(--accent-danger)' }}>Error</h2>

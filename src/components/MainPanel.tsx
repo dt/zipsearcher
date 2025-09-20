@@ -63,7 +63,7 @@ function MainPanel() {
     { key: 'Enter', cmd: true, handler: runQuery },
   ]);
 
-  if (!state.zip) {
+  if (!state.zip || state.tablesLoading) {
     return (
       <div className="main-panel">
         <div className="content-area">

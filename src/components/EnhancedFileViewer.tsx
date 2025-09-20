@@ -35,8 +35,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
 
   // Filter state
   const [filterText, setFilterText] = useState(tab.filterText || '');
-  const [contextLines, setContextLines] = useState(0);
-  const [isRegex, setIsRegex] = useState(false);
+  const [contextLines, setContextLines] = useState('');
   const [visibleLineCount, setVisibleLineCount] = useState(0);
   const [totalLineCount, setTotalLineCount] = useState(0);
 
@@ -135,7 +134,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
 
   // Store initial filter state
   if (filterText) {
-    initialFilterRef.current = { text: filterText, context: contextLines };
+    initialFilterRef.current = { text: filterText, context: parseInt(contextLines) || 0 };
   }
 
   // DEBUG: Uncomment to test with different language
@@ -155,9 +154,14 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
 
     // Reset if empty
     if (!query) {
-      editorRef.current.setHiddenAreas([]);
+      // Clear hidden areas by using fold/unfold functionality instead
+      const model = editorRef.current.getModel();
+      if (model && monacoRef.current) {
+        editorRef.current.setSelection(new monacoRef.current.Selection(1, 1, model.getLineCount(), 1));
+        editorRef.current.trigger('editor', 'editor.unfoldAll', {});
+      }
       decorationIds.current = editorRef.current.deltaDecorations(decorationIds.current, []);
-      setVisibleLineCount(model.getLineCount()); // Show all lines
+      setVisibleLineCount(model?.getLineCount() || 0); // Show all lines
       return;
     }
 
@@ -208,8 +212,8 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
       }
     }
 
-    // Use setHiddenAreas to actually hide the non-matching lines
-    editorRef.current.setHiddenAreas(hiddenRanges);
+    // Note: setHiddenAreas is not available in Monaco editor
+    // Instead, we'll use a different approach with decorations to show matches
 
     // Update visible line count (subtract 1 for the always-visible line 1 if no actual matches)
     const actualMatches = matchingLines.length > 0 ? visible.size : 0;
@@ -400,16 +404,10 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
   const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setFilterText(value);
-    debouncedApplyFilter(value, contextLines);
+    const numericContext = contextLines === '' ? 0 : parseInt(contextLines, 10);
+    debouncedApplyFilter(value, numericContext);
   }, [contextLines, debouncedApplyFilter]);
 
-  const handleContextChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
-    setContextLines(value);
-    if (filterText) {
-      debouncedApplyFilter(filterText, value);
-    }
-  }, [filterText, debouncedApplyFilter]);
 
   // Open search with keyboard shortcut
   const openSearch = useCallback(() => {
@@ -478,28 +476,21 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
             onChange={handleFilterChange}
           />
           <input
-            type="number"
+            type="text"
             className="context-input"
-            placeholder="Context"
+            placeholder="plus context lines"
             value={contextLines}
-            onChange={handleContextChange}
-            min="0"
-            max="10"
-            style={{ width: '60px' }}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Only allow empty string or numeric input
+              if (value === '' || /^\d+$/.test(value)) {
+                setContextLines(value);
+                const numericValue = value === '' ? 0 : parseInt(value, 10);
+                debouncedApplyFilter(filterText, numericValue);
+              }
+            }}
+            style={{ width: '120px' }}
           />
-          <label className="regex-toggle">
-            <input
-              type="checkbox"
-              checked={isRegex}
-              onChange={(e) => {
-                setIsRegex(e.target.checked);
-                if (filterText) {
-                  applyFilter(filterText, contextLines);
-                }
-              }}
-            />
-            Regex
-          </label>
           {filterText && (
             <span className="filter-status">
               {visibleLineCount.toLocaleString()} / {totalLineCount.toLocaleString()} lines
@@ -556,7 +547,7 @@ function EnhancedFileViewer({ tab }: FileViewerProps) {
           contextmenu: true,
           // Better selection
           selectionHighlight: true,
-          occurrencesHighlight: true,
+          occurrencesHighlight: "singleFile",
           // Format on paste
           formatOnPaste: false,
           formatOnType: false,

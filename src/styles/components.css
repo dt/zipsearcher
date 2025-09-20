@@ -335,6 +335,28 @@
   border: none !important;
 }
 
+/* Monaco Editor Autocomplete Fix - ensure suggest widgets are visible */
+.monaco-editor .suggest-widget,
+.monaco-editor .parameter-hints-widget,
+.monaco-editor .monaco-hover,
+.monaco-editor .context-view {
+  z-index: 10000 !important;
+}
+
+/* Monaco Editor containers should not clip overflow to allow autocomplete */
+.sql-editor-container {
+  overflow: visible !important;
+}
+
+.sql-editor-container .monaco-editor {
+  overflow: visible !important;
+}
+
+/* Ensure Monaco suggest details widget is also visible */
+.monaco-editor .suggest-details {
+  z-index: 10001 !important;
+}
+
 .grep-exclude-highlight {
   background-color: rgba(255, 100, 100, 0.2) !important;
   text-decoration: line-through;
@@ -620,6 +642,10 @@
 .table-item-compact.deferred {
   background: var(--bg-secondary);
   border: 1px solid var(--border-secondary);
+}
+
+.table-item-compact.unloaded {
+  opacity: 0.5;
 }
 
 .table-name-compact {

@@ -146,6 +146,104 @@ export const COLUMN_TYPE_HINTS: ColumnTypeHint[] = [
     column: 'metrics',
     duckdbType: 'VARCHAR',
     description: 'Large JSON field that breaks auto-detection'
+  },
+
+  // Protobuf columns that are converted to JSON should be typed as JSON
+  {
+    table: 'system.descriptor',
+    column: 'descriptor',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system_descriptor',
+    column: 'descriptor',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'descriptor',
+    column: 'descriptor',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system.span_configurations',
+    column: 'config',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system_span_configurations',
+    column: 'config',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'span_configurations',
+    column: 'config',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'span_configs',
+    column: 'config',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system.jobs',
+    column: 'payload',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system_jobs',
+    column: 'payload',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'jobs',
+    column: 'payload',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system.jobs',
+    column: 'progress',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system_jobs',
+    column: 'progress',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'jobs',
+    column: 'progress',
+    duckdbType: 'JSON',
+    description: 'Protobuf data converted to JSON'
+  },
+  {
+    table: 'system.job_info',
+    column: 'value',
+    duckdbType: 'VARCHAR',
+    description: 'Mixed data - some values are protobuf, others are plain strings'
+  },
+  {
+    table: 'system_job_info',
+    column: 'value',
+    duckdbType: 'VARCHAR',
+    description: 'Mixed data - some values are protobuf, others are plain strings'
+  },
+  {
+    table: 'job_info',
+    column: 'value',
+    duckdbType: 'VARCHAR',
+    description: 'Mixed data - some values are protobuf, others are plain strings'
   }
 ];
 

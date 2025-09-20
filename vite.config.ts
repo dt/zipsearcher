@@ -15,7 +15,19 @@ export default defineConfig({
         // Ensure consistent file naming for caching
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        manualChunks: {
+          // Split Monaco Editor into separate chunk
+          monaco: ['@monaco-editor/react', 'monaco-editor'],
+          // Split DuckDB (though WASM is already separate)
+          duckdb: ['@duckdb/duckdb-wasm'],
+          // Split protobuf libraries
+          protobuf: ['protobufjs'],
+          // Split React vendor dependencies
+          vendor: ['react', 'react-dom'],
+          // Split compression/zip libraries
+          compression: ['fflate']
+        }
       }
     }
   }

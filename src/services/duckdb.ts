@@ -7,8 +7,8 @@ import duckdb_wasm_eh from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import eh_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 
 export class DuckDBService {
-  private db: duckdb.AsyncDuckDB | null = null;
-  private conn: duckdb.AsyncDuckDBConnection | null = null;
+  protected db: duckdb.AsyncDuckDB | null = null;
+  protected conn: duckdb.AsyncDuckDBConnection | null = null;
   private initialized = false;
   private loadedTables = new Set<string>();
 
@@ -138,8 +138,8 @@ export class DuckDBService {
               header=true,
               columns={${columnsClause}},
               auto_detect=false,
-              quote='',
-              escape=''
+              quote='"',
+              escape='"'
             )
           `;
         } else {

@@ -2,32 +2,38 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api';
-import { DuckDBService, DuckDBQueryResult, DuckDBConnection as IDuckDBConnection } from './duckdb-interface';
+import { type DuckDBService, type DuckDBQueryResult, type DuckDBConnection as IDuckDBConnection } from './duckdb-interface';
 import { preprocessCSV, shouldPreprocess } from '../crdb/csvPreprocessor';
 import { getTableTypeHints } from '../crdb/columnTypeRegistry';
 
 class NodeDuckDBQueryResult implements DuckDBQueryResult {
-  constructor(private rows: any[]) {}
+  private _rows: any;
+  constructor(_rows: any) {
+    this._rows = _rows;
+  }
 
   toArray(): any[] {
-    return this.rows;
+    return this._rows;
   }
 
   get(index: number): any {
-    return this.rows[index];
+    return this._rows[index];
   }
 
   get rows(): any[] {
-    return this.rows;
+    return this._rows;
   }
 }
 
 class NodeDuckDBConnectionImpl implements IDuckDBConnection {
-  constructor(private conn: DuckDBConnection) {}
+  private conn: DuckDBConnection;
+  constructor(conn: DuckDBConnection) {
+    this.conn = conn;
+  }
 
   async query(sql: string): Promise<DuckDBQueryResult> {
     const result = await this.conn.run(sql);
-    return new NodeDuckDBQueryResult(result);
+    return new NodeDuckDBQueryResult(result as any);
   }
 
   async close(): Promise<void> {
@@ -77,7 +83,7 @@ export class NodeDuckDBService implements DuckDBService {
       const countResult = await this.conn.run(
         `SELECT COUNT(*) as count FROM ${cleanTableName}`
       );
-      return countResult[0].count;
+      return (countResult as any)[0].count;
     }
 
     try {
@@ -226,7 +232,8 @@ export class NodeDuckDBService implements DuckDBService {
       const countResult = await this.conn.run(
         `SELECT COUNT(*) as count FROM ${cleanTableName}`
       );
-      const count = countResult && countResult.length > 0 ? countResult[0].count : 0;
+      const countArray = countResult as any;
+      const count = countArray && countArray.length > 0 ? countArray[0].count : 0;
 
       this.loadedTables.add(tableName);
       return count;
@@ -243,7 +250,7 @@ export class NodeDuckDBService implements DuckDBService {
 
     try {
       const result = await this.conn.run(sql);
-      return new NodeDuckDBQueryResult(result);
+      return new NodeDuckDBQueryResult(result as any);
     } catch (error) {
       console.error('Query failed:', error);
       throw error;
@@ -263,7 +270,7 @@ export class NodeDuckDBService implements DuckDBService {
         ORDER BY function_name
       `);
 
-      return result.map((row: any) => ({
+      return (result as any).map((row: any) => ({
         name: row.function_name.toUpperCase(),
         type: row.function_type
       }));
